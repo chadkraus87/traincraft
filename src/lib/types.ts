@@ -31,6 +31,7 @@ export interface Exercise {
   name: string;
   description: string;
   pattern: string;
+  category: string;
   muscle_groups: string[];
   equipment_types: string[];
   difficulty: "beginner" | "intermediate" | "advanced";

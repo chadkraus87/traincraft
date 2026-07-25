@@ -50,8 +50,8 @@ export default async function Dashboard({
         </div>
       )}
       <div>
-        <h1 className="display text-3xl">Your gym floor</h1>
-        <p className="text-steel text-sm mt-1">{clients ?? 0} clients · {plans ?? 0} plans built</p>
+        <h1 className="display text-4xl">Your gym floor</h1>
+        <p className="text-steel text-base mt-1">{clients ?? 0} clients · {plans ?? 0} plans built</p>
       </div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -63,45 +63,45 @@ export default async function Dashboard({
               strokeLinecap="round" strokeDasharray={RING_CIRCUMFERENCE} strokeDashoffset={ringOffset}
               transform="rotate(-90 36 36)"
             />
-            <text x="36" y="41" textAnchor="middle" fontSize="18" fontWeight="500" fill="#F5F1E8">{qaPassRate}%</text>
+            <text x="36" y="41" textAnchor="middle" fontSize="20" fontWeight="600" fill="#F5F1E8">{qaPassRate}%</text>
           </svg>
-          <p className="text-[11px] text-[#C9C4B8] mt-2">Plans QA-passed</p>
+          <p className="text-sm text-[#C9C4B8] mt-2">Plans QA-passed</p>
         </div>
         <div className="bg-coral rounded-xl p-4 flex flex-col justify-center">
-          <p className="text-xs text-[#FAECE7]">Active clients</p>
-          <p className="text-3xl font-medium text-[#FFF6F2] mt-1">{clients ?? 0}</p>
+          <p className="text-base text-[#FAECE7]">Active clients</p>
+          <p className="text-4xl font-medium text-[#FFF6F2] mt-1">{clients ?? 0}</p>
         </div>
         <div className="bg-success rounded-xl p-4 flex flex-col justify-center">
-          <p className="text-xs text-[#E7F2DC]">Plans this week</p>
-          <p className="text-3xl font-medium text-[#F3FAEC] mt-1">{plansThisWeek ?? 0}</p>
+          <p className="text-base text-[#E7F2DC]">Plans this week</p>
+          <p className="text-4xl font-medium text-[#F3FAEC] mt-1">{plansThisWeek ?? 0}</p>
         </div>
       </div>
 
       <div className="grid sm:grid-cols-3 gap-3">
         <Link href="/clients" className="bg-[#FFF6F2] hover:bg-[#FDECE3] rounded-xl p-4 transition-colors">
-          <span className="text-sm font-medium text-[#A34526]">Clients →</span>
-          <p className="text-xs text-steel mt-1">Rosters, injuries, equipment</p>
+          <span className="text-lg font-medium text-[#A34526]">Clients →</span>
+          <p className="text-sm text-steel mt-1">Rosters, injuries, equipment</p>
         </Link>
         <Link href="/plans/new" className="bg-[#FFF6F2] hover:bg-[#FDECE3] rounded-xl p-4 transition-colors">
-          <span className="text-sm font-medium text-[#A34526]">Build a plan →</span>
-          <p className="text-xs text-steel mt-1">AI programming with safety checks</p>
+          <span className="text-lg font-medium text-[#A34526]">Build a plan →</span>
+          <p className="text-sm text-steel mt-1">AI programming with safety checks</p>
         </Link>
         <Link href="/exercises" className="bg-[#FFF6F2] hover:bg-[#FDECE3] rounded-xl p-4 transition-colors">
-          <span className="text-sm font-medium text-[#A34526]">Library →</span>
-          <p className="text-xs text-steel mt-1">Base + your custom exercises</p>
+          <span className="text-lg font-medium text-[#A34526]">Library →</span>
+          <p className="text-sm text-steel mt-1">Base + your custom exercises</p>
         </Link>
       </div>
 
       <div className="card">
-        <h2 className="display text-lg mb-3">Recent plans</h2>
-        {(recent ?? []).length === 0 && <p className="text-sm text-steel">No plans yet. Add a client, then build one.</p>}
+        <h2 className="display text-2xl mb-3">Recent plans</h2>
+        {(recent ?? []).length === 0 && <p className="text-base text-steel">No plans yet. Add a client, then build one.</p>}
         <ul className="divide-y divide-steel/10">
           {(recent ?? []).map((p) => (
             <li key={p.id} className="py-2 flex items-center justify-between">
-              <Link href={`/plans/${p.id}`} className="text-sm hover:text-coral">
+              <Link href={`/plans/${p.id}`} className="text-base hover:text-coral">
                 {p.title} <span className="text-steel">· {(p.clients as unknown as { full_name: string })?.full_name}</span>
               </Link>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#6B4408]"}`}>
+              <span className={`text-sm px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#6B4408]"}`}>
                 {p.status === "final" ? "QA passed" : "Draft — review QA"}
               </span>
             </li>

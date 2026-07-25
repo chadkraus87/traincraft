@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { EQUIPMENT_TYPES } from "@/lib/safety/rules";
+import { EQUIPMENT_GROUPS } from "@/lib/safety/rules";
 
 interface Props {
   clients: { id: string; full_name: string }[];
@@ -78,22 +78,40 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
       <div>
         <button
           type="button"
-          className="text-xs text-coral underline"
+          className="w-full text-left text-base font-medium text-coral underline decoration-2 underline-offset-2 py-1"
           onClick={() => setShowEquipment((s) => !s)}
         >
-          {showEquipment ? "Hide" : "Consider additional equipment"} {extraEquipment.length > 0 && `(${extraEquipment.length} selected)`}
+          {showEquipment ? "▾ Hide equipment options" : "▸ Consider additional equipment"} {extraEquipment.length > 0 && `(${extraEquipment.length} selected)`}
         </button>
         {showEquipment && (
-          <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-3 bg-steel/5 rounded-md">
-            {EQUIPMENT_TYPES.map((t) => (
-              <label key={t} className="flex items-center gap-1.5 text-xs">
-                <input
-                  type="checkbox"
-                  checked={extraEquipment.includes(t)}
-                  onChange={() => toggleEquipment(t)}
-                />
-                {t.replace(/_/g, " ")}
-              </label>
+          <div className="mt-2 space-y-3 p-3 bg-steel/5 rounded-md">
+            {EQUIPMENT_GROUPS.map((group) => (
+              <div key={group.label}>
+                <p className="text-xs font-medium text-steel uppercase tracking-wide mb-1.5">{group.label}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {group.types.map((t) => {
+                    const selected = extraEquipment.includes(t);
+                    return (
+                      <label
+                        key={t}
+                        className={
+                          selected
+                            ? "flex items-center gap-2 text-sm px-2.5 py-1.5 rounded-md border-2 border-coral bg-coral/10 cursor-pointer"
+                            : "flex items-center gap-2 text-sm px-2.5 py-1.5 rounded-md border border-steel/30 bg-white cursor-pointer hover:border-coral"
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleEquipment(t)}
+                          className="shrink-0"
+                        />
+                        {t.replace(/_/g, " ")}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </div>
         )}

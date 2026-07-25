@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --font-display: "Space Grotesk", system-ui, sans-serif;
-  --font-body: "Space Grotesk", system-ui, sans-serif;
+  --font-display: "Barlow Condensed", system-ui, sans-serif;
+  --font-body: "Barlow Condensed", system-ui, sans-serif;
 }
 
 body { @apply bg-paper text-ink font-body antialiased; }
@@ -63,3 +63,5 @@ body { @apply bg-paper text-ink font-body antialiased; }
 @media (prefers-reduced-motion: reduce) {
   .bg-blob { animation: none; }
 }
+html { font-size: 20px; }
+body { line-height: 1.5; }

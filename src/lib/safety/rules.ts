@@ -257,6 +257,32 @@ export const EQUIPMENT_TYPES = [
   "full_gym",
 ] as const;
 
+// ── Exercise categories ──────────────────────────────────────────────────
+// Used to organize the exercise library by workout style instead of a flat
+// list, and as the required field on custom exercises.
+export const EXERCISE_CATEGORIES = [
+  "Foundational strength",
+  "CrossFit",
+  "Functional movement",
+  "Hyrox",
+  "HIIT",
+  "Yoga",
+  "Mat Pilates",
+  "Senior-specific",
+] as const;
+
+// ── Equipment groups ─────────────────────────────────────────────────────
+// Groups EQUIPMENT_TYPES by kind of gear (not workout style) for the
+// clickable equipment picker on the Build a Plan screen. Every entry in
+// EQUIPMENT_TYPES must appear in exactly one group here.
+export const EQUIPMENT_GROUPS: { label: string; types: string[] }[] = [
+  { label: "Free weights", types: ["dumbbell", "barbell", "kettlebell", "sandbag"] },
+  { label: "Bodyweight & mat", types: ["yoga_mat", "suspension", "band"] },
+  { label: "Rig & stations", types: ["rack", "bench", "box", "pullup_bar", "landmine"] },
+  { label: "Cardio & conditioning", types: ["jump_rope", "rower", "ski_erg", "sled", "battle_ropes"] },
+  { label: "Other", types: ["medicine_ball", "full_gym"] },
+];
+
 // ── Helper: resolve exclusions for a client ─────────────────────────────
 export interface ExerciseLike {
   id: string;

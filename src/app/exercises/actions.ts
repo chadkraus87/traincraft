@@ -12,6 +12,7 @@ export async function addCustomExercise(form: FormData) {
     name: String(form.get("name")),
     description: String(form.get("description")),
     pattern: String(form.get("pattern")),
+    category: String(form.get("category") || "Foundational strength"),
     muscle_groups: split(String(form.get("muscle_groups") || "")),
     equipment_types: split(String(form.get("equipment_types") || "bodyweight")),
     difficulty: String(form.get("difficulty")),

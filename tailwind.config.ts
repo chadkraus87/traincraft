@@ -8,7 +8,7 @@ export default {
         ink: "#1A1A1A",
         coral: "#D85A30",
         terracotta: "#E8825C",
-        paper: "#F5F1E8",
+        paper: "#D4D2CC",
         steel: "#6B6558",
         signal: "#EF9F27",
         alarm: "#C6362F",
