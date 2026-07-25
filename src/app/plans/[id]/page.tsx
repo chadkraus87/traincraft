@@ -28,7 +28,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <DeliverButtons planId={planRow.id} hasEmail={!!client.email} hasPhone={!!client.phone} />
+          <DeliverButtons planId={planRow.id} hasEmail={!!client.email} />
           <DeletePlanButton planId={planRow.id} clientId={client.id} planTitle={planRow.title} />
         </div>
       </div>
