@@ -1,15 +1,16 @@
 /**
  * POST /api/plans/:id/deliver  body: { channel: "email" | "sms" }
- * Email (Resend): full PDF attached. Free tier 3k/mo — fits one trainer easily.
+ * Email: sent directly through the trainer's own Gmail account via SMTP
+ * (see src/lib/email.ts), with the PDF attached.
  * SMS (Twilio): short summary + note that the full plan was emailed. Requires
  * A2P 10DLC registration in the Twilio console for US numbers.
  * Every attempt is logged to `deliveries` for an audit trail.
  */
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
 import twilio from "twilio";
 import { supabaseServer } from "@/lib/supabase/server";
 import { planToPdf } from "@/lib/pdf";
+import { sendEmail } from "@/lib/email";
 import type { PlanJson } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -43,18 +44,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   try {
     if (channel === "email") {
-      const resend = new Resend(process.env.RESEND_API_KEY);
       const pdf = await planToPdf(client, plan.title, plan.plan, plan.weeks);
-      const { data, error } = await resend.emails.send({
-        from: process.env.RESEND_FROM!,
+      const messageId = await sendEmail({
         to: destination,
         subject: `Your new training plan: ${plan.title}`,
         text: emailBody(client.full_name, plan.title, plan.plan),
         attachments: [{ filename: `${plan.title}.pdf`, content: pdf }],
       });
-      if (error) throw new Error(error.message);
-      await log("sent", data?.id);
-      return NextResponse.json({ ok: true, id: data?.id });
+      await log("sent", messageId);
+      return NextResponse.json({ ok: true, id: messageId });
     }
 
     if (channel === "sms") {
