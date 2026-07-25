@@ -1,0 +1,78 @@
+import { supabaseServer } from "@/lib/supabase/server";
+import { addCustomExercise } from "./actions";
+
+const PATTERNS = [
+  "squat","hinge","lunge","push_horizontal","push_vertical","pull_horizontal",
+  "pull_vertical","core_antiextension","core_antirotation","core_flexion",
+  "carry","conditioning","mobility",
+];
+
+export default async function ExercisesPage({ searchParams }: { searchParams: Promise<{ q?: string; pattern?: string }> }) {
+  const { q, pattern } = await searchParams;
+  const supabase = await supabaseServer();
+  let query = supabase.from("exercises").select("*").eq("is_active", true).order("name");
+  if (q) query = query.ilike("name", `%${q}%`);
+  if (pattern) query = query.eq("pattern", pattern);
+  const { data: exercises } = await query;
+
+  return (
+    <div className="grid md:grid-cols-[1fr_340px] gap-6">
+      <div>
+        <h1 className="display text-3xl mb-4">Exercise library</h1>
+        <form className="flex gap-2 mb-4">
+          <input name="q" defaultValue={q} className="input" placeholder="Search exercises…" />
+          <select name="pattern" defaultValue={pattern ?? ""} className="input max-w-48">
+            <option value="">All patterns</option>
+            {PATTERNS.map((p) => <option key={p} value={p}>{p.replace("_", " ")}</option>)}
+          </select>
+          <button className="btn">Filter</button>
+        </form>
+        <ul className="space-y-2">
+          {(exercises ?? []).map((e) => (
+            <li key={e.id} className="card">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">
+                    {e.name}{" "}
+                    {e.trainer_id && <span className="text-xs px-1.5 py-0.5 rounded bg-moss/20 text-pine align-middle">Custom</span>}
+                  </p>
+                  <p className="text-xs text-steel mt-0.5">{e.description}</p>
+                  <p className="text-xs text-steel mt-1">
+                    {e.pattern.replace("_", " ")} · {e.muscle_groups.join(", ")} · {e.equipment_types.join(", ")} · {e.difficulty}
+                  </p>
+                  {e.cues && <p className="text-xs mt-1 whitespace-pre-wrap text-ink/80">{e.cues}</p>}
+                </div>
+                {e.contraindication_tags.length > 0 && (
+                  <span className="text-[10px] uppercase tracking-wide text-alarm shrink-0" title={e.contraindication_tags.join(", ")}>
+                    ⚑ {e.contraindication_tags.length} safety tag{e.contraindication_tags.length > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <aside className="card h-fit">
+        <h2 className="display text-lg mb-1">Add custom exercise</h2>
+        <p className="text-xs text-steel mb-3">Usable by the Workout Builder exactly like the base library. Add safety tags so the contraindication engine can protect injured clients from it too.</p>
+        <form action={addCustomExercise} className="space-y-2">
+          <input name="name" required className="input" placeholder="Name" />
+          <textarea name="description" required rows={2} className="input" placeholder="Description" />
+          <select name="pattern" className="input">
+            {PATTERNS.map((p) => <option key={p} value={p}>{p.replace("_", " ")}</option>)}
+          </select>
+          <input name="muscle_groups" className="input" placeholder="Muscles (comma-sep): glutes, hamstrings" />
+          <input name="equipment_types" className="input" placeholder="Equipment: kettlebell, band (or bodyweight)" />
+          <select name="difficulty" className="input">
+            <option>beginner</option><option>intermediate</option><option>advanced</option>
+          </select>
+          <textarea name="cues" rows={2} className="input" placeholder="Coaching cues (one per line)" />
+          <input name="contraindication_tags" className="input" placeholder="Safety tags: overhead, high_impact…" />
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="unilateral" /> Unilateral (per side)</label>
+          <button className="btn w-full justify-center">Add to library</button>
+        </form>
+      </aside>
+    </div>
+  );
+}

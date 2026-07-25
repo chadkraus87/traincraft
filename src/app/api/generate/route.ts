@@ -1,0 +1,92 @@
+/**
+ * POST /api/generate · orchestrates Builder -> QA -> retry -> persist.
+ * Failed QA on the retry still saves the plan as a draft with the QA report
+ * attached, so the trainer sees exactly which checks failed.
+ */
+import { NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase/server";
+import { buildWorkout } from "@/lib/ai/builder";
+import { validatePlan } from "@/lib/ai/validate";
+import { WORKOUT_TYPES, type LimitationTag } from "@/lib/safety/rules";
+
+export const maxDuration = 120;
+
+export async function POST(req: Request) {
+  const supabase = await supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+
+  const body = await req.json();
+  const { clientId, workoutType, weeks = 4, daysPerWeek = 3, title, extraInstructions } = body;
+  if (!clientId || !WORKOUT_TYPES[workoutType])
+    return NextResponse.json({ error: "clientId and valid workoutType required" }, { status: 400 });
+
+  const [{ data: client }, { data: limitations }, { data: equipment }, { data: pool }] =
+    await Promise.all([
+      supabase.from("clients").select("*").eq("id", clientId).single(),
+      supabase.from("client_limitations").select("*").eq("client_id", clientId).eq("active", true),
+      supabase.from("client_equipment").select("*").eq("client_id", clientId),
+      supabase.from("exercises").select("*").eq("is_active", true),
+    ]);
+  if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+
+  const limitationTags = (limitations ?? []).map((l) => l.tag as LimitationTag);
+  const input = {
+    client,
+    limitations: limitationTags,
+    equipment: equipment ?? [],
+    pool: pool ?? [],
+    workoutType,
+    weeks,
+    daysPerWeek,
+    extraInstructions,
+  } as const;
+
+  try {
+    // Attempt 1
+    let { plan, allowedPool } = await buildWorkout(input);
+    let qa = validatePlan(plan, allowedPool, limitationTags, workoutType, daysPerWeek, 1);
+
+    // One retry with failure feedback folded into trainer notes
+    if (!qa.passed) {
+      const failures = qa.checks.filter((c) => !c.pass).map((c) => `${c.name}: ${c.detail}`).join(" | ");
+      const retry = await buildWorkout({
+        ...input,
+        extraInstructions: `${extraInstructions ?? ""}\nPREVIOUS ATTEMPT FAILED QA — fix these exactly: ${failures}`,
+      });
+      const retryQa = validatePlan(retry.plan, retry.allowedPool, limitationTags, workoutType, daysPerWeek, 2);
+      if (retryQa.passed || countPasses(retryQa) >= countPasses(qa)) {
+        plan = retry.plan;
+        qa = retryQa;
+      }
+    }
+
+    const { data: saved, error } = await supabase
+      .from("workout_plans")
+      .insert({
+        trainer_id: user.id,
+        client_id: clientId,
+        title: title || `${WORKOUT_TYPES[workoutType].label} — ${client.full_name}`,
+        workout_type: workoutType,
+        weeks,
+        days_per_week: daysPerWeek,
+        status: qa.passed ? "final" : "draft",
+        plan,
+        qa_report: qa,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    return NextResponse.json({ id: saved.id, qa });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Generation failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+function countPasses(r: { checks: { pass: boolean }[] }) {
+  return r.checks.filter((c) => c.pass).length;
+}
