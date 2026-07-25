@@ -29,7 +29,7 @@ export default function Login() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       }).catch(() => {});
-      window.location.href = "/";
+      window.location.href = "/?welcome=1";
       return;
     }
 

@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
+  const { welcome } = await searchParams;
   const supabase = await supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -23,6 +28,11 @@ export default async function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {welcome === "1" && (
+        <div className="border-l-4 border-pine bg-pine/10 text-pine px-4 py-3 rounded-r-md text-sm">
+          Account created — you're all set.
+        </div>
+      )}
       <div>
         <h1 className="display text-3xl">Your gym floor</h1>
         <p className="text-steel text-sm mt-1">{clients ?? 0} clients · {plans ?? 0} plans built</p>
