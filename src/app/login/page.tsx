@@ -10,7 +10,8 @@ export default function Login() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async () => {
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setErr(null);
     setBusy(true);
     const supabase = supabaseBrowser();
@@ -40,14 +41,14 @@ export default function Login() {
   return (
     <div className="card max-w-md mx-auto mt-16">
       <div className="flex gap-4 mb-4 text-sm">
-        <button className={mode === "signin" ? "font-medium text-pine" : "text-steel"} onClick={() => { setMode("signin"); setErr(null); }}>Sign in</button>
-        <button className={mode === "signup" ? "font-medium text-pine" : "text-steel"} onClick={() => { setMode("signup"); setErr(null); }}>Create account</button>
+        <button type="button" className={mode === "signin" ? "font-medium text-pine" : "text-steel"} onClick={() => { setMode("signin"); setErr(null); }}>Sign in</button>
+        <button type="button" className={mode === "signup" ? "font-medium text-pine" : "text-steel"} onClick={() => { setMode("signup"); setErr(null); }}>Create account</button>
       </div>
       <h1 className="display text-2xl mb-4">{mode === "signup" ? "Create your account" : "Sign in"}</h1>
-      <div className="space-y-3">
+      <form onSubmit={submit} className="space-y-3">
         <div>
           <span className="label">Email</span>
-          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required />
         </div>
         <div>
           <span className="label">Password</span>
@@ -59,6 +60,8 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder={mode === "signup" ? "Choose a password (min 6 characters)" : "Your password"}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              minLength={6}
+              required
             />
             <button
               type="button"
@@ -70,10 +73,10 @@ export default function Login() {
           </div>
         </div>
         {err && <p className="text-sm text-alarm">{err}</p>}
-        <button className="btn w-full justify-center" onClick={submit} disabled={!email || password.length < 6 || busy}>
+        <button type="submit" className="btn w-full justify-center" disabled={!email || password.length < 6 || busy}>
           {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
         </button>
-      </div>
+      </form>
     </div>
   );
 }
