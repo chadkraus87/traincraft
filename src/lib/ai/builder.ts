@@ -84,7 +84,9 @@ HARD CONSTRAINTS:
 - Use ONLY exercises from the provided pool. Echo each exercise's id exactly.
 - Do not invent exercises, substitute names, or reference equipment not listed.
 
-OUTPUT: respond with ONLY a JSON object (no markdown fences) matching:
+OUTPUT: your response will be completed starting from an opening "{" —
+continue directly into the JSON object with no other text before or after,
+matching:
 {
   "sessions": [{ "day": 1, "focus": "string", "blocks": [{ "exercise_id": "uuid", "name": "string", "sets": 3, "reps": "8-10", "load_note": "string", "rest_sec": 90, "coaching_note": "string" }] }],
   "progression_notes": "week-over-week progression + deload guidance, plain text"
@@ -106,30 +108,45 @@ ${input.extraInstructions ? `TRAINER NOTES: ${input.extraInstructions}` : ""}
 ALLOWED EXERCISE POOL (the only exercises you may use):
 ${poolLines}`;
 
+  // Prefill: starting Claude's own reply with "{" makes it structurally
+  // continue a JSON object rather than write free text — this is a
+  // stronger guarantee than an instruction, it can't add a preamble
+  // sentence before something it's already begun. Also cuts response
+  // time, since no throwaway preamble tokens get generated.
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 8000,
     system,
-    messages: [{ role: "user", content: user }],
+    messages: [
+      { role: "user", content: user },
+      { role: "assistant", content: "{" },
+    ],
   });
 
-  const text = msg.content
+  const continuation = msg.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("");
 
-  if (!text.trim()) {
+  if (!continuation.trim()) {
     throw new Error(
       `Claude returned no text (stop reason: ${msg.stop_reason}). Try again — if this repeats, reduce days/week or weeks.`
     );
   }
 
-  const clean = text.replace(/```json|```/g, "").trim();
+  // Reconstitute the full JSON: our prefill "{" plus Claude's continuation.
+  const full = "{" + continuation;
+
+  // Safety net: trim anything after the last closing brace, in case a
+  // trailing note slipped in despite the prefill.
+  const lastBrace = full.lastIndexOf("}");
+  const clean = lastBrace === -1 ? full : full.slice(0, lastBrace + 1);
+
   let parsed: Omit<PlanJson, "exclusions">;
   try {
     parsed = JSON.parse(clean) as Omit<PlanJson, "exclusions">;
   } catch {
-    console.error("Failed to parse Claude's response as JSON. Raw output:\n", text);
+    console.error("Failed to parse Claude's response as JSON. Raw output:\n", full);
     throw new Error(
       msg.stop_reason === "max_tokens"
         ? "The generated plan was too long and got cut off. Try fewer days per week."

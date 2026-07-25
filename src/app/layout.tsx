@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { supabaseServer } from "@/lib/supabase/server";
 import SignOutButton from "@/components/SignOutButton";
+import { Dumbbell } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "TrainCraft",
@@ -24,21 +25,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body>
-        <header className="bg-pine text-paper">
+        <header className="bg-ink text-paper">
           <div className="mx-auto max-w-5xl px-5 py-4 flex items-center justify-between">
-            <Link href="/" className="display text-xl font-extrabold">
-              Train<span className="text-moss">Craft</span>
+            <Link href="/" className="display text-xl font-extrabold flex items-center gap-2">
+              <Dumbbell className="text-coral" size={20} aria-hidden="true" />
+              Train<span className="text-terracotta">Craft</span>
             </Link>
             <nav className="flex gap-6 text-sm items-center">
               {user ? (
                 <>
-                  <Link href="/clients" className="hover:text-moss">Clients</Link>
-                  <Link href="/exercises" className="hover:text-moss">Exercise library</Link>
-                  <Link href="/plans/new" className="hover:text-moss">New plan</Link>
+                  <Link href="/clients" className="hover:text-terracotta">Clients</Link>
+                  <Link href="/exercises" className="hover:text-terracotta">Exercise library</Link>
+                  <Link href="/plans/new" className="hover:text-terracotta">New plan</Link>
                   <SignOutButton />
                 </>
               ) : (
-                <Link href="/login" className="hover:text-moss">Sign in</Link>
+                <Link href="/login" className="hover:text-terracotta">Sign in</Link>
               )}
             </nav>
           </div>

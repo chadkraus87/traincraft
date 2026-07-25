@@ -6,5 +6,5 @@ export default function SignOutButton() {
     await supabaseBrowser().auth.signOut();
     window.location.href = "/login";
   };
-  return <button onClick={signOut} className="hover:text-moss">Sign out</button>;
+  return <button onClick={signOut} className="hover:text-terracotta">Sign out</button>;
 }

@@ -61,7 +61,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                     <input type="hidden" name="id" value={l.id} />
                     <input type="hidden" name="client_id" value={client.id} />
                     <input type="hidden" name="active" value={String(!l.active)} />
-                    <button className="text-xs underline text-steel hover:text-pine">
+                    <button className="text-xs underline text-steel hover:text-coral">
                       {l.active ? "Mark resolved" : "Reactivate"}
                     </button>
                   </form>
@@ -120,8 +120,8 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
         <ul className="divide-y divide-steel/10">
           {(plans ?? []).map((p) => (
             <li key={p.id} className="py-2 flex items-center justify-between">
-              <Link href={`/plans/${p.id}`} className="text-sm hover:text-pine">{p.title}</Link>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-pine/10 text-pine" : "bg-signal/20 text-alarm"}`}>
+              <Link href={`/plans/${p.id}`} className="text-sm hover:text-coral">{p.title}</Link>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#6B4408]"}`}>
                 {p.status === "final" ? "QA passed" : "Draft"}
               </span>
             </li>

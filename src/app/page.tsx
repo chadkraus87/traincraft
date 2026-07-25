@@ -29,7 +29,7 @@ export default async function Dashboard({
   return (
     <div className="space-y-8">
       {welcome === "1" && (
-        <div className="border-l-4 border-pine bg-pine/10 text-pine px-4 py-3 rounded-r-md text-sm">
+        <div className="border-l-4 border-coral bg-coral/10 text-coral px-4 py-3 rounded-r-md text-sm">
           Account created — you're all set.
         </div>
       )}
@@ -38,9 +38,9 @@ export default async function Dashboard({
         <p className="text-steel text-sm mt-1">{clients ?? 0} clients · {plans ?? 0} plans built</p>
       </div>
       <div className="grid sm:grid-cols-3 gap-4">
-        <Link href="/clients" className="card hover:border-pine"><span className="display text-sm text-pine">Clients →</span><p className="text-sm text-steel mt-1">Rosters, injuries, equipment</p></Link>
-        <Link href="/plans/new" className="card hover:border-pine"><span className="display text-sm text-pine">Build a plan →</span><p className="text-sm text-steel mt-1">AI programming with safety checks</p></Link>
-        <Link href="/exercises" className="card hover:border-pine"><span className="display text-sm text-pine">Library →</span><p className="text-sm text-steel mt-1">Base + your custom exercises</p></Link>
+        <Link href="/clients" className="card hover:border-coral"><span className="display text-sm text-coral">Clients →</span><p className="text-sm text-steel mt-1">Rosters, injuries, equipment</p></Link>
+        <Link href="/plans/new" className="card hover:border-coral"><span className="display text-sm text-coral">Build a plan →</span><p className="text-sm text-steel mt-1">AI programming with safety checks</p></Link>
+        <Link href="/exercises" className="card hover:border-coral"><span className="display text-sm text-coral">Library →</span><p className="text-sm text-steel mt-1">Base + your custom exercises</p></Link>
       </div>
       <div className="card">
         <h2 className="display text-lg mb-3">Recent plans</h2>
@@ -48,10 +48,10 @@ export default async function Dashboard({
         <ul className="divide-y divide-steel/10">
           {(recent ?? []).map((p) => (
             <li key={p.id} className="py-2 flex items-center justify-between">
-              <Link href={`/plans/${p.id}`} className="text-sm hover:text-pine">
+              <Link href={`/plans/${p.id}`} className="text-sm hover:text-coral">
                 {p.title} <span className="text-steel">· {(p.clients as unknown as { full_name: string })?.full_name}</span>
               </Link>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-pine/10 text-pine" : "bg-signal/20 text-alarm"}`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#6B4408]"}`}>
                 {p.status === "final" ? "QA passed" : "Draft — review QA"}
               </span>
             </li>

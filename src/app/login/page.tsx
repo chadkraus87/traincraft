@@ -24,11 +24,6 @@ export default function Login() {
         setBusy(false);
         return;
       }
-      fetch("/api/auth/welcome", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      }).catch(() => {});
       window.location.href = "/?welcome=1";
       return;
     }
@@ -41,8 +36,8 @@ export default function Login() {
   return (
     <div className="card max-w-md mx-auto mt-16">
       <div className="flex gap-4 mb-4 text-sm">
-        <button type="button" className={mode === "signin" ? "font-medium text-pine" : "text-steel"} onClick={() => { setMode("signin"); setErr(null); }}>Sign in</button>
-        <button type="button" className={mode === "signup" ? "font-medium text-pine" : "text-steel"} onClick={() => { setMode("signup"); setErr(null); }}>Create account</button>
+        <button type="button" className={mode === "signin" ? "font-medium text-coral" : "text-steel"} onClick={() => { setMode("signin"); setErr(null); }}>Sign in</button>
+        <button type="button" className={mode === "signup" ? "font-medium text-coral" : "text-steel"} onClick={() => { setMode("signup"); setErr(null); }}>Create account</button>
       </div>
       <h1 className="display text-2xl mb-4">{mode === "signup" ? "Create your account" : "Sign in"}</h1>
       <form onSubmit={submit} className="space-y-3">
@@ -66,7 +61,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => setShowPassword((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-steel hover:text-pine"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-steel hover:text-coral"
             >
               {showPassword ? "Hide" : "Show"}
             </button>

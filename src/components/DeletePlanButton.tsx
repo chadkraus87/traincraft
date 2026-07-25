@@ -16,7 +16,7 @@ export default function DeletePlanButton({
   if (!confirming) {
     return (
       <button
-        className="btn-ghost border-alarm/40 text-alarm hover:border-alarm hover:text-alarm"
+        className="btn-danger"
         onClick={() => setConfirming(true)}
       >
         Delete plan
@@ -30,7 +30,7 @@ export default function DeletePlanButton({
       <form action={deletePlan}>
         <input type="hidden" name="id" value={planId} />
         <input type="hidden" name="client_id" value={clientId} />
-        <button className="btn-ghost border-alarm text-alarm hover:bg-alarm hover:text-paper">
+        <button className="btn-danger">
           Yes, delete
         </button>
       </form>

@@ -22,7 +22,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
           <h1 className="display text-3xl">{planRow.title}</h1>
           <p className="text-sm text-steel mt-1">
             {client.full_name} · {planRow.weeks} weeks · {planRow.days_per_week} days/week ·{" "}
-            <span className={planRow.status === "final" ? "text-pine" : "text-alarm"}>
+            <span className={planRow.status === "final" ? "text-success" : "text-[#6B4408]"}>
               {planRow.status === "final" ? "QA passed" : "Draft — QA flagged issues below"}
             </span>
           </p>
@@ -71,7 +71,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
           <h2 className="display text-lg mb-3">Day {sess.day} — {sess.focus}</h2>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-steel uppercase tracking-wider border-b border-pine/30">
+              <tr className="text-left text-xs text-steel uppercase tracking-wider border-b border-coral/30">
                 <th className="py-1.5 pr-2">Exercise</th><th className="py-1.5 pr-2">Sets</th>
                 <th className="py-1.5 pr-2">Reps</th><th className="py-1.5 pr-2">Load</th><th className="py-1.5">Rest</th>
               </tr>

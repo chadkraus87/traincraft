@@ -34,7 +34,7 @@ export default async function ExercisesPage({ searchParams }: { searchParams: Pr
                 <div>
                   <p className="font-medium">
                     {e.name}{" "}
-                    {e.trainer_id && <span className="text-xs px-1.5 py-0.5 rounded bg-moss/20 text-pine align-middle">Custom</span>}
+                    {e.trainer_id && <span className="text-xs px-1.5 py-0.5 rounded bg-terracotta/20 text-coral align-middle">Custom</span>}
                   </p>
                   <p className="text-xs text-steel mt-0.5">{e.description}</p>
                   <p className="text-xs text-steel mt-1">

@@ -16,12 +16,12 @@ export default async function ClientsPage() {
         <ul className="space-y-2">
           {(clients ?? []).map((c) => (
             <li key={c.id}>
-              <Link href={`/clients/${c.id}`} className="card flex items-center justify-between hover:border-pine">
+              <Link href={`/clients/${c.id}`} className="card flex items-center justify-between hover:border-coral">
                 <div>
                   <p className="font-medium">{c.full_name}</p>
                   <p className="text-xs text-steel">{c.goals ?? "No goals logged"}</p>
                 </div>
-                {c.is_remote && <span className="text-xs px-2 py-0.5 rounded-full bg-moss/20 text-pine">Remote</span>}
+                {c.is_remote && <span className="text-xs px-2 py-0.5 rounded-full bg-terracotta/20 text-coral">Remote</span>}
               </Link>
             </li>
           ))}

@@ -13,7 +13,7 @@ export default function ClientEditPanel({ client }: { client: Client }) {
         <button className="btn-ghost" onClick={() => setEditing(true)}>Edit client</button>
         {!confirmingDelete ? (
           <button
-            className="btn-ghost border-alarm/40 text-alarm hover:border-alarm hover:text-alarm"
+            className="btn-danger"
             onClick={() => setConfirmingDelete(true)}
           >
             Delete client
@@ -23,7 +23,7 @@ export default function ClientEditPanel({ client }: { client: Client }) {
             <span className="text-alarm">Delete {client.full_name} and all their plans, permanently?</span>
             <form action={deleteClient}>
               <input type="hidden" name="id" value={client.id} />
-              <button className="btn-ghost border-alarm text-alarm hover:bg-alarm hover:text-paper">
+              <button className="btn-danger">
                 Yes, delete
               </button>
             </form>

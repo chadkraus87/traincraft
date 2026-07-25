@@ -11,8 +11,25 @@ body { @apply bg-paper text-ink font-body antialiased; }
 
 .display { @apply font-display uppercase tracking-wide; }
 .card { @apply bg-white border border-steel/20 rounded-lg p-5; }
-.btn { @apply inline-flex items-center gap-2 rounded-md bg-pine text-paper px-4 py-2 text-sm font-medium hover:bg-ink transition-colors disabled:opacity-50; }
-.btn-ghost { @apply inline-flex items-center rounded-md border border-steel/40 px-4 py-2 text-sm hover:border-pine hover:text-pine transition-colors; }
-.input { @apply w-full rounded-md border border-steel/30 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pine/40; }
+
+.btn { @apply inline-flex items-center gap-2 rounded-md bg-coral text-paper px-4 py-2 text-sm font-medium hover:bg-ink transition-colors disabled:opacity-50; }
+
+.btn-ghost {
+  @apply inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50;
+  background-color: #F3E9D2;
+  border: 1.5px solid #C9A876;
+  color: #5C4426;
+}
+.btn-ghost:hover { background-color: #EBDDBC; }
+
+.btn-danger {
+  @apply inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50;
+  background-color: #FDECEA;
+  border: 1.5px solid #C6362F;
+  color: #791313;
+}
+.btn-danger:hover { background-color: #FBDAD7; }
+
+.input { @apply w-full rounded-md border border-steel/30 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coral/40; }
 .label { @apply block text-xs font-medium text-steel uppercase tracking-wider mb-1; }
 .flag { @apply border-l-4 border-signal bg-signal/10 px-3 py-2 text-sm rounded-r-md; }

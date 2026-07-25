@@ -5,13 +5,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#16211B",
-        pine: "#1E4D3B",
-        moss: "#7BA88F",
-        paper: "#F7F6F2",
-        steel: "#5C6660",
-        signal: "#E0A63C",
-        alarm: "#B4552D",
+        ink: "#1A1A1A",
+        coral: "#D85A30",
+        terracotta: "#E8825C",
+        paper: "#F5F1E8",
+        steel: "#6B6558",
+        signal: "#EF9F27",
+        alarm: "#C6362F",
+        success: "#4C9A2A",
       },
       fontFamily: {
         display: ["var(--font-display)"],
