@@ -33,3 +33,33 @@ body { @apply bg-paper text-ink font-body antialiased; }
 .input { @apply w-full rounded-md border border-steel/30 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coral/40; }
 .label { @apply block text-xs font-medium text-steel uppercase tracking-wider mb-1; }
 .flag { @apply border-l-4 border-signal bg-signal/10 px-3 py-2 text-sm rounded-r-md; }
+
+.pattern-dots {
+  background-color: #1A1A1A;
+  background-image: radial-gradient(rgba(232, 130, 92, 0.4) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
+}
+
+.bg-blobs { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.bg-blob { position: absolute; border-radius: 9999px; filter: blur(70px); opacity: 0.22; }
+.bg-blob-1 { width: 560px; height: 560px; top: -160px; left: -120px; background: #D85A30; animation: float-a 22s ease-in-out infinite; }
+.bg-blob-2 { width: 520px; height: 520px; top: 30%; right: -180px; background: #4C9A2A; animation: float-b 26s ease-in-out infinite; }
+.bg-blob-3 { width: 480px; height: 480px; bottom: -160px; left: 15%; background: #E8825C; animation: float-c 20s ease-in-out infinite; }
+
+@keyframes float-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -50px) scale(1.08); }
+}
+@keyframes float-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-50px, 40px) scale(1.05); }
+}
+@keyframes float-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, 50px) scale(1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-blob { animation: none; }
+}
+.bg-blob-4 { width: 440px; height: 440px; bottom: 10%; right: 10%; background: #D85A30; animation: float-b 24s ease-in-out infinite; }

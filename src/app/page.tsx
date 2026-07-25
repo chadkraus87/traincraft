@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 
+const RING_RADIUS = 30;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
 export default async function Dashboard({
   searchParams,
 }: {
@@ -19,12 +22,25 @@ export default async function Dashboard({
     );
   }
 
-  const [{ count: clients }, { count: plans }, { data: recent }] = await Promise.all([
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [
+    { count: clients },
+    { count: plans },
+    { count: passedPlans },
+    { count: plansThisWeek },
+    { data: recent },
+  ] = await Promise.all([
     supabase.from("clients").select("*", { count: "exact", head: true }),
     supabase.from("workout_plans").select("*", { count: "exact", head: true }),
+    supabase.from("workout_plans").select("*", { count: "exact", head: true }).eq("status", "final"),
+    supabase.from("workout_plans").select("*", { count: "exact", head: true }).gte("created_at", weekAgo),
     supabase.from("workout_plans").select("id,title,status,created_at,clients(full_name)")
       .order("created_at", { ascending: false }).limit(5),
   ]);
+
+  const qaPassRate = plans && plans > 0 ? Math.round(((passedPlans ?? 0) / plans) * 100) : 0;
+  const ringOffset = RING_CIRCUMFERENCE * (1 - qaPassRate / 100);
 
   return (
     <div className="space-y-8">
@@ -37,11 +53,45 @@ export default async function Dashboard({
         <h1 className="display text-3xl">Your gym floor</h1>
         <p className="text-steel text-sm mt-1">{clients ?? 0} clients · {plans ?? 0} plans built</p>
       </div>
-      <div className="grid sm:grid-cols-3 gap-4">
-        <Link href="/clients" className="card hover:border-coral"><span className="display text-sm text-coral">Clients →</span><p className="text-sm text-steel mt-1">Rosters, injuries, equipment</p></Link>
-        <Link href="/plans/new" className="card hover:border-coral"><span className="display text-sm text-coral">Build a plan →</span><p className="text-sm text-steel mt-1">AI programming with safety checks</p></Link>
-        <Link href="/exercises" className="card hover:border-coral"><span className="display text-sm text-coral">Library →</span><p className="text-sm text-steel mt-1">Base + your custom exercises</p></Link>
+
+      <div className="grid sm:grid-cols-3 gap-3">
+        <div className="bg-ink rounded-xl p-4 flex flex-col items-center justify-center">
+          <svg width="72" height="72" viewBox="0 0 72 72">
+            <circle cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#3A3A3A" strokeWidth="7" />
+            <circle
+              cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#D85A30" strokeWidth="7"
+              strokeLinecap="round" strokeDasharray={RING_CIRCUMFERENCE} strokeDashoffset={ringOffset}
+              transform="rotate(-90 36 36)"
+            />
+            <text x="36" y="41" textAnchor="middle" fontSize="18" fontWeight="500" fill="#F5F1E8">{qaPassRate}%</text>
+          </svg>
+          <p className="text-[11px] text-[#C9C4B8] mt-2">Plans QA-passed</p>
+        </div>
+        <div className="bg-coral rounded-xl p-4 flex flex-col justify-center">
+          <p className="text-xs text-[#FAECE7]">Active clients</p>
+          <p className="text-3xl font-medium text-[#FFF6F2] mt-1">{clients ?? 0}</p>
+        </div>
+        <div className="bg-success rounded-xl p-4 flex flex-col justify-center">
+          <p className="text-xs text-[#E7F2DC]">Plans this week</p>
+          <p className="text-3xl font-medium text-[#F3FAEC] mt-1">{plansThisWeek ?? 0}</p>
+        </div>
       </div>
+
+      <div className="grid sm:grid-cols-3 gap-3">
+        <Link href="/clients" className="bg-[#FFF6F2] hover:bg-[#FDECE3] rounded-xl p-4 transition-colors">
+          <span className="text-sm font-medium text-[#A34526]">Clients →</span>
+          <p className="text-xs text-steel mt-1">Rosters, injuries, equipment</p>
+        </Link>
+        <Link href="/plans/new" className="bg-[#FFF6F2] hover:bg-[#FDECE3] rounded-xl p-4 transition-colors">
+          <span className="text-sm font-medium text-[#A34526]">Build a plan →</span>
+          <p className="text-xs text-steel mt-1">AI programming with safety checks</p>
+        </Link>
+        <Link href="/exercises" className="bg-[#FFF6F2] hover:bg-[#FDECE3] rounded-xl p-4 transition-colors">
+          <span className="text-sm font-medium text-[#A34526]">Library →</span>
+          <p className="text-xs text-steel mt-1">Base + your custom exercises</p>
+        </Link>
+      </div>
+
       <div className="card">
         <h2 className="display text-lg mb-3">Recent plans</h2>
         {(recent ?? []).length === 0 && <p className="text-sm text-steel">No plans yet. Add a client, then build one.</p>}
