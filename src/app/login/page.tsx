@@ -3,7 +3,6 @@ import { useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 export default function Login() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -15,19 +14,6 @@ export default function Login() {
     setErr(null);
     setBusy(true);
     const supabase = supabaseBrowser();
-
-    if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) { setErr(error.message); setBusy(false); return; }
-      if (!data.session) {
-        setErr("Almost there — Supabase still has email confirmation turned on. See the setup note below to turn it off, then try again.");
-        setBusy(false);
-        return;
-      }
-      window.location.href = "/?welcome=1";
-      return;
-    }
-
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setErr(error.message); setBusy(false); return; }
     window.location.href = "/";
@@ -35,11 +21,7 @@ export default function Login() {
 
   return (
     <div className="card max-w-md mx-auto mt-16">
-      <div className="flex gap-4 mb-4 text-sm">
-        <button type="button" className={mode === "signin" ? "font-medium text-coral" : "text-steel"} onClick={() => { setMode("signin"); setErr(null); }}>Sign in</button>
-        <button type="button" className={mode === "signup" ? "font-medium text-coral" : "text-steel"} onClick={() => { setMode("signup"); setErr(null); }}>Create account</button>
-      </div>
-      <h1 className="display text-2xl mb-4">{mode === "signup" ? "Create your account" : "Sign in"}</h1>
+      <h1 className="display text-2xl mb-4">Sign in</h1>
       <form onSubmit={submit} className="space-y-3">
         <div>
           <span className="label">Email</span>
@@ -53,8 +35,8 @@ export default function Login() {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={mode === "signup" ? "Choose a password (min 6 characters)" : "Your password"}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              placeholder="Your password"
+              autoComplete="current-password"
               minLength={6}
               required
             />
@@ -69,7 +51,7 @@ export default function Login() {
         </div>
         {err && <p className="text-sm text-alarm">{err}</p>}
         <button type="submit" className="btn w-full justify-center" disabled={!email || password.length < 6 || busy}>
-          {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
+          {busy ? "Please wait…" : "Sign in"}
         </button>
       </form>
     </div>
