@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const body = await req.json();
-  const { clientId, workoutType, weeks = 4, daysPerWeek = 3, title, extraInstructions } = body;
+  const { clientId, workoutType, weeks = 4, daysPerWeek = 3, title, extraInstructions, extraEquipmentTypes } = body;
   if (!clientId || !WORKOUT_TYPES[workoutType])
     return NextResponse.json({ error: "clientId and valid workoutType required" }, { status: 400 });
 
@@ -32,17 +32,29 @@ export async function POST(req: Request) {
     ]);
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
+  // Equipment picked in the "consider additional equipment" toggle is
+  // ephemeral — used for this generation only, never written to the
+  // client's saved equipment record.
+  const extraEquipment = ((extraEquipmentTypes ?? []) as string[]).map((type) => ({
+    id: `extra-${type}`,
+    client_id: clientId,
+    label: `${type.replace(/_/g, " ")} (this plan only)`,
+    equipment_type: type,
+    quantity: 1,
+    weight_lb: null,
+  }));
+
   const limitationTags = (limitations ?? []).map((l) => l.tag as LimitationTag);
   const input = {
     client,
     limitations: limitationTags,
-    equipment: equipment ?? [],
+    equipment: [...(equipment ?? []), ...extraEquipment],
     pool: pool ?? [],
     workoutType,
     weeks,
     daysPerWeek,
     extraInstructions,
-  } as const;
+  };
 
   try {
     // Attempt 1

@@ -1,14 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { LIMITATION_TAGS, LIMITATION_LABELS } from "@/lib/safety/rules";
+import { LIMITATION_TAGS, LIMITATION_LABELS, EQUIPMENT_TYPES } from "@/lib/safety/rules";
 import { addLimitation, toggleLimitation, addEquipment, removeEquipment } from "../actions";
 import ClientEditPanel from "@/components/ClientEditPanel";
-
-const EQUIPMENT_TYPES = [
-  "kettlebell", "dumbbell", "barbell", "band", "bench", "box", "pullup_bar",
-  "suspension", "rack", "landmine", "full_gym",
-];
 
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

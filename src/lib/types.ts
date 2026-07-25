@@ -58,6 +58,7 @@ export interface PlanSession {
 export interface PlanJson {
   sessions: PlanSession[];
   progression_notes: string;
+  trainer_notes?: string;
   exclusions: {
     exercise_name: string;
     limitation_tag: string;
@@ -83,10 +84,14 @@ export interface QaCheck {
   name: string;
   pass: boolean;
   detail: string;
+  dismissed?: boolean;      // trainer reviewed and dismissed this concern
+  addressedNote?: string;   // trainer's note on how it was handled
 }
 
 export interface QaReport {
   passed: boolean;
   checks: QaCheck[];
   attempts: number;
+  trainerConfirmed?: boolean;
+  trainerConfirmedAt?: string;
 }

@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --font-display: "Archivo", "Arial Black", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Space Grotesk", system-ui, sans-serif;
 }
 
 body { @apply bg-paper text-ink font-body antialiased; }
@@ -45,6 +45,7 @@ body { @apply bg-paper text-ink font-body antialiased; }
 .bg-blob-1 { width: 560px; height: 560px; top: -160px; left: -120px; background: #D85A30; animation: float-a 22s ease-in-out infinite; }
 .bg-blob-2 { width: 520px; height: 520px; top: 30%; right: -180px; background: #4C9A2A; animation: float-b 26s ease-in-out infinite; }
 .bg-blob-3 { width: 480px; height: 480px; bottom: -160px; left: 15%; background: #E8825C; animation: float-c 20s ease-in-out infinite; }
+.bg-blob-4 { width: 440px; height: 440px; bottom: 10%; right: 10%; background: #D85A30; animation: float-b 24s ease-in-out infinite; }
 
 @keyframes float-a {
   0%, 100% { transform: translate(0, 0) scale(1); }
@@ -62,4 +63,3 @@ body { @apply bg-paper text-ink font-body antialiased; }
 @media (prefers-reduced-motion: reduce) {
   .bg-blob { animation: none; }
 }
-.bg-blob-4 { width: 440px; height: 440px; bottom: 10%; right: 10%; background: #D85A30; animation: float-b 24s ease-in-out infinite; }

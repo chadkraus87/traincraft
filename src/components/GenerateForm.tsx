@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { EQUIPMENT_TYPES } from "@/lib/safety/rules";
 
 interface Props {
   clients: { id: string; full_name: string }[];
@@ -15,8 +16,16 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
   const [weeks, setWeeks] = useState(4);
   const [days, setDays] = useState(3);
   const [notes, setNotes] = useState("");
+  const [showEquipment, setShowEquipment] = useState(false);
+  const [extraEquipment, setExtraEquipment] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const toggleEquipment = (type: string) => {
+    setExtraEquipment((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
 
   const generate = async () => {
     setBusy(true); setErr(null);
@@ -24,7 +33,10 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, workoutType, weeks, daysPerWeek: days, extraInstructions: notes }),
+        body: JSON.stringify({
+          clientId, workoutType, weeks, daysPerWeek: days,
+          extraInstructions: notes, extraEquipmentTypes: extraEquipment,
+        }),
       });
       const raw = await res.text();
       let json: { id?: string; error?: string };
@@ -62,6 +74,34 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
       <div><span className="label">Trainer notes (optional)</span>
         <textarea rows={2} className="input" value={notes} onChange={(e) => setNotes(e.target.value)}
           placeholder="e.g. She loves kettlebell work; keep sessions under 45 min" /></div>
+
+      <div>
+        <button
+          type="button"
+          className="text-xs text-coral underline"
+          onClick={() => setShowEquipment((s) => !s)}
+        >
+          {showEquipment ? "Hide" : "Consider additional equipment"} {extraEquipment.length > 0 && `(${extraEquipment.length} selected)`}
+        </button>
+        {showEquipment && (
+          <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-3 bg-steel/5 rounded-md">
+            {EQUIPMENT_TYPES.map((t) => (
+              <label key={t} className="flex items-center gap-1.5 text-xs">
+                <input
+                  type="checkbox"
+                  checked={extraEquipment.includes(t)}
+                  onChange={() => toggleEquipment(t)}
+                />
+                {t.replace(/_/g, " ")}
+              </label>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-steel mt-1">
+          Optional — considered for this plan only, not saved to the client&apos;s permanent equipment list.
+        </p>
+      </div>
+
       {err && <p className="text-sm text-alarm">{err}</p>}
       <button className="btn w-full justify-center" onClick={generate} disabled={busy || !clientId}>
         {busy ? "Programming… (safety filter → Claude → QA)" : "Generate plan"}

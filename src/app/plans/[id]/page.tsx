@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { LIMITATION_LABELS } from "@/lib/safety/rules";
+import { LIMITATION_LABELS, filterForLimitations, filterForEquipment, type LimitationTag } from "@/lib/safety/rules";
 import DeliverButtons from "@/components/DeliverButtons";
 import DeletePlanButton from "@/components/DeletePlanButton";
-import QaReportCard from "@/components/QaReportCard";
+import QaReportEditor from "@/components/QaReportEditor";
+import PlanEditor from "@/components/PlanEditor";
 import type { PlanJson, QaReport } from "@/lib/types";
 
 export default async function PlanView({ params }: { params: Promise<{ id: string }> }) {
@@ -15,6 +16,19 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
   const plan = planRow.plan as PlanJson;
   const qa = planRow.qa_report as QaReport | null;
   const client = planRow.clients;
+
+  // Same safety + equipment filter the generator uses, recomputed here so
+  // the plan editor's "add/swap exercise" picker can never offer anything
+  // contraindicated or unavailable for this client.
+  const [{ data: limitations }, { data: equipment }, { data: exercisePool }] = await Promise.all([
+    supabase.from("client_limitations").select("*").eq("client_id", client.id).eq("active", true),
+    supabase.from("client_equipment").select("*").eq("client_id", client.id),
+    supabase.from("exercises").select("*").eq("is_active", true),
+  ]);
+  const limitationTags = (limitations ?? []).map((l) => l.tag as LimitationTag);
+  const { allowed } = filterForLimitations(exercisePool ?? [], limitationTags);
+  const ownedTypes = (equipment ?? []).map((e) => e.equipment_type);
+  const { usable } = filterForEquipment(allowed, ownedTypes);
 
   return (
     <div className="space-y-6">
@@ -39,7 +53,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      {qa && <QaReportCard qa={qa} />}
+      {qa && <QaReportEditor planId={planRow.id} initialQa={qa} />}
 
       {plan.exclusions.length > 0 && (
         <div className="flag">
@@ -56,38 +70,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {plan.sessions.map((sess) => (
-        <div key={sess.day} className="card">
-          <h2 className="display text-lg mb-3">Day {sess.day} — {sess.focus}</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-steel uppercase tracking-wider border-b border-coral/30">
-                <th className="py-1.5 pr-2">Exercise</th><th className="py-1.5 pr-2">Sets</th>
-                <th className="py-1.5 pr-2">Reps</th><th className="py-1.5 pr-2">Load</th><th className="py-1.5">Rest</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sess.blocks.map((b, i) => (
-                <tr key={i} className="border-b border-steel/10 align-top">
-                  <td className="py-2 pr-2">
-                    {b.name}
-                    {b.coaching_note && <p className="text-xs text-steel">{b.coaching_note}</p>}
-                  </td>
-                  <td className="py-2 pr-2">{b.sets}</td>
-                  <td className="py-2 pr-2">{b.reps}</td>
-                  <td className="py-2 pr-2">{b.load_note}</td>
-                  <td className="py-2">{b.rest_sec}s</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-
-      <div className="card">
-        <h2 className="display text-lg mb-2">Progression</h2>
-        <p className="text-sm whitespace-pre-wrap">{plan.progression_notes}</p>
-      </div>
+      <PlanEditor planId={planRow.id} initialPlan={plan} pool={usable} />
     </div>
   );
 }

@@ -231,6 +231,32 @@ export const PROGRESSION_RULES = {
   ],
 };
 
+// ── Equipment vocabulary ─────────────────────────────────────────────────
+// Single source of truth for equipment types, used by the client equipment
+// form, the "consider additional equipment" toggle on plan generation, and
+// the exercise library seed data.
+export const EQUIPMENT_TYPES = [
+  "kettlebell",
+  "dumbbell",
+  "barbell",
+  "band",
+  "bench",
+  "box",
+  "pullup_bar",
+  "suspension",
+  "rack",
+  "landmine",
+  "yoga_mat",
+  "jump_rope",
+  "rower",
+  "medicine_ball",
+  "sandbag",
+  "sled",
+  "ski_erg",
+  "battle_ropes",
+  "full_gym",
+] as const;
+
 // ── Helper: resolve exclusions for a client ─────────────────────────────
 export interface ExerciseLike {
   id: string;
