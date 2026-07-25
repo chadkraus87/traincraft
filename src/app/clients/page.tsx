@@ -32,7 +32,7 @@ export default async function ClientsPage() {
         <form action={addClient} className="space-y-3">
           <div><span className="label">Full name</span><input name="full_name" required className="input" /></div>
           <div><span className="label">Email</span><input name="email" type="email" className="input" /></div>
-          <div><span className="label">Phone (for SMS, +1…)</span><input name="phone" className="input" placeholder="+15125550100" /></div>
+          <div><span className="label">Phone (optional)</span><input name="phone" className="input" placeholder="(512) 555-0100" /></div>
           <div><span className="label">Goals</span><input name="goals" className="input" placeholder="Fat loss, first pull-up" /></div>
           <div><span className="label">Training history / notes</span><textarea name="training_history" rows={3} className="input" /></div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="is_remote" /> Remote client (home equipment only)</label>

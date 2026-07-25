@@ -47,8 +47,8 @@ export default function ClientEditPanel({ client }: { client: Client }) {
         <input name="full_name" defaultValue={client.full_name} required className="input" /></div>
       <div><span className="label">Email</span>
         <input name="email" type="email" defaultValue={client.email ?? ""} className="input" /></div>
-      <div><span className="label">Phone (for SMS, +1…)</span>
-        <input name="phone" defaultValue={client.phone ?? ""} className="input" placeholder="+15125550100" /></div>
+      <div><span className="label">Phone (optional)</span>
+        <input name="phone" defaultValue={client.phone ?? ""} className="input" placeholder="(512) 555-0100" /></div>
       <div><span className="label">Goals</span>
         <input name="goals" defaultValue={client.goals ?? ""} className="input" /></div>
       <div><span className="label">Training history / notes</span>
