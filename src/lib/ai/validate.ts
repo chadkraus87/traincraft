@@ -14,6 +14,19 @@ import type { Exercise, PlanJson, QaCheck, QaReport } from "@/lib/types";
 const PUSH = new Set(["push_horizontal", "push_vertical"]);
 const PULL = new Set(["pull_horizontal", "pull_vertical"]);
 
+// Internal check names (below) stay snake_case — tests and the retry-
+// feedback loop key off these exact strings. This lookup is purely for
+// display, so the trainer never sees the code-facing names.
+export const QA_CHECK_LABELS: Record<string, string> = {
+  pool_membership: "Every exercise really exists in your library",
+  contraindications: "No conflicts with logged injuries",
+  session_count: "Correct number of sessions",
+  movement_balance: "Balanced movement patterns for this workout type",
+  pull_push_ratio: "Balanced pulling vs. pushing volume",
+  volume_sanity: "Reasonable number of exercises and sets per session",
+  progression_defined: "Clear week-to-week progression, including a deload",
+};
+
 export function validatePlan(
   plan: PlanJson,
   allowedPool: Exercise[],

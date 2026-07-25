@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { LIMITATION_LABELS } from "@/lib/safety/rules";
 import DeliverButtons from "@/components/DeliverButtons";
 import DeletePlanButton from "@/components/DeletePlanButton";
+import QaReportCard from "@/components/QaReportCard";
 import type { PlanJson, QaReport } from "@/lib/types";
 
 export default async function PlanView({ params }: { params: Promise<{ id: string }> }) {
@@ -38,18 +39,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      {qa && !qa.passed && (
-        <div className="card border-alarm/40">
-          <h2 className="display text-sm text-alarm mb-2">QA report — review before sending</h2>
-          <ul className="space-y-1 text-sm">
-            {qa.checks.map((c) => (
-              <li key={c.name} className={c.pass ? "text-steel" : "text-alarm"}>
-                {c.pass ? "✓" : "✗"} <span className="font-medium">{c.name}</span>: {c.detail}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {qa && <QaReportCard qa={qa} />}
 
       {plan.exclusions.length > 0 && (
         <div className="flag">
