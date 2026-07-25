@@ -7,12 +7,29 @@
   --font-body: "Barlow Condensed", system-ui, sans-serif;
 }
 
+/* Barlow Condensed reads smaller and tighter than most fonts at the same
+   size — scale the root up so every text-xs/sm/base class (all rem-based)
+   grows proportionally without hunting down every usage individually. */
+html { font-size: 20px; }
+body { line-height: 1.5; }
+
 body { @apply bg-paper text-ink font-body antialiased; }
+body {
+  background-image: linear-gradient(rgba(18, 17, 16, 0.6), rgba(18, 17, 16, 0.6)), url('/background-art.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
 
 .display { @apply font-display uppercase tracking-wide; }
-.card { @apply bg-white border border-steel/20 rounded-lg p-5; }
+.card { @apply bg-surface border border-steel/35 rounded-lg p-5; }
 
-.btn { @apply inline-flex items-center gap-2 rounded-md bg-coral text-paper px-4 py-2 text-sm font-medium hover:bg-ink transition-colors disabled:opacity-50; }
+.btn {
+  @apply inline-flex items-center gap-2 rounded-md bg-coral px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50;
+  color: #1C1005;
+}
+.btn:hover { background-color: #F2895E; }
 
 .btn-ghost {
   @apply inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50;
@@ -25,43 +42,17 @@ body { @apply bg-paper text-ink font-body antialiased; }
 .btn-danger {
   @apply inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50;
   background-color: #FDECEA;
-  border: 1.5px solid #C6362F;
+  border: 1.5px solid #E2503F;
   color: #791313;
 }
 .btn-danger:hover { background-color: #FBDAD7; }
 
-.input { @apply w-full rounded-md border border-steel/30 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coral/40; }
+.input { @apply w-full rounded-md border border-steel/30 bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-coral/40; }
 .label { @apply block text-xs font-medium text-steel uppercase tracking-wider mb-1; }
 .flag { @apply border-l-4 border-signal bg-signal/10 px-3 py-2 text-sm rounded-r-md; }
 
 .pattern-dots {
   background-color: #1A1A1A;
-  background-image: radial-gradient(rgba(232, 130, 92, 0.4) 1.5px, transparent 1.5px);
+  background-image: radial-gradient(rgba(242, 137, 94, 0.5) 1.5px, transparent 1.5px);
   background-size: 14px 14px;
 }
-
-.bg-blobs { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.bg-blob { position: absolute; border-radius: 9999px; filter: blur(70px); opacity: 0.22; }
-.bg-blob-1 { width: 560px; height: 560px; top: -160px; left: -120px; background: #D85A30; animation: float-a 22s ease-in-out infinite; }
-.bg-blob-2 { width: 520px; height: 520px; top: 30%; right: -180px; background: #4C9A2A; animation: float-b 26s ease-in-out infinite; }
-.bg-blob-3 { width: 480px; height: 480px; bottom: -160px; left: 15%; background: #E8825C; animation: float-c 20s ease-in-out infinite; }
-.bg-blob-4 { width: 440px; height: 440px; bottom: 10%; right: 10%; background: #D85A30; animation: float-b 24s ease-in-out infinite; }
-
-@keyframes float-a {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(40px, -50px) scale(1.08); }
-}
-@keyframes float-b {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-50px, 40px) scale(1.05); }
-}
-@keyframes float-c {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(30px, 50px) scale(1.1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bg-blob { animation: none; }
-}
-html { font-size: 20px; }
-body { line-height: 1.5; }

@@ -25,13 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body>
-        <div className="bg-blobs" aria-hidden="true">
-          <div className="bg-blob bg-blob-1" />
-          <div className="bg-blob bg-blob-2" />
-          <div className="bg-blob bg-blob-3" />
-          <div className="bg-blob bg-blob-4" />
-        </div>
-        <header className="pattern-dots text-paper relative z-10">
+        <header className="pattern-dots text-ink relative z-10">
           <div className="mx-auto max-w-5xl px-5 py-4 flex items-center justify-between">
             <Link href="/" className="display text-xl font-extrabold flex items-center gap-2">
               <Dumbbell className="text-coral" size={20} aria-hidden="true" />

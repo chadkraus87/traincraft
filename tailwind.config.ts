@@ -5,14 +5,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#1A1A1A",
-        coral: "#D85A30",
-        terracotta: "#E8825C",
-        paper: "#D4D2CC",
-        steel: "#6B6558",
-        signal: "#EF9F27",
-        alarm: "#C6362F",
-        success: "#4C9A2A",
+        ink: "#F2F0EB",
+        coral: "#EC6B3A",
+        terracotta: "#F2895E",
+        paper: "#121110",
+        surface: "#1C1B18",
+        steel: "#A39E92",
+        signal: "#F4A93A",
+        alarm: "#E2503F",
+        success: "#5DA83A",
       },
       fontFamily: {
         display: ["var(--font-display)"],

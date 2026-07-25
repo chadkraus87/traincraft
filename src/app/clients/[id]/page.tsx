@@ -116,7 +116,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
           {(plans ?? []).map((p) => (
             <li key={p.id} className="py-2 flex items-center justify-between">
               <Link href={`/plans/${p.id}`} className="text-sm hover:text-coral">{p.title}</Link>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#6B4408]"}`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#F4C77A]"}`}>
                 {p.status === "final" ? "QA passed" : "Draft"}
               </span>
             </li>

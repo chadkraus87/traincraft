@@ -55,11 +55,11 @@ export default async function Dashboard({
       </div>
 
       <div className="grid sm:grid-cols-3 gap-3">
-        <div className="bg-ink rounded-xl p-4 flex flex-col items-center justify-center">
+        <div className="bg-[#0D0C0A] rounded-xl p-4 flex flex-col items-center justify-center">
           <svg width="72" height="72" viewBox="0 0 72 72">
             <circle cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#3A3A3A" strokeWidth="7" />
             <circle
-              cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#D85A30" strokeWidth="7"
+              cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#EC6B3A" strokeWidth="7"
               strokeLinecap="round" strokeDasharray={RING_CIRCUMFERENCE} strokeDashoffset={ringOffset}
               transform="rotate(-90 36 36)"
             />
@@ -68,12 +68,12 @@ export default async function Dashboard({
           <p className="text-sm text-[#C9C4B8] mt-2">Plans QA-passed</p>
         </div>
         <div className="bg-coral rounded-xl p-4 flex flex-col justify-center">
-          <p className="text-base text-[#FAECE7]">Active clients</p>
-          <p className="text-4xl font-medium text-[#FFF6F2] mt-1">{clients ?? 0}</p>
+          <p className="text-base text-[#4A2410]">Active clients</p>
+          <p className="text-4xl font-medium text-[#1C1005] mt-1">{clients ?? 0}</p>
         </div>
         <div className="bg-success rounded-xl p-4 flex flex-col justify-center">
-          <p className="text-base text-[#E7F2DC]">Plans this week</p>
-          <p className="text-4xl font-medium text-[#F3FAEC] mt-1">{plansThisWeek ?? 0}</p>
+          <p className="text-base text-[#1F3712]">Plans this week</p>
+          <p className="text-4xl font-medium text-[#12220A] mt-1">{plansThisWeek ?? 0}</p>
         </div>
       </div>
 
@@ -101,7 +101,7 @@ export default async function Dashboard({
               <Link href={`/plans/${p.id}`} className="text-base hover:text-coral">
                 {p.title} <span className="text-steel">· {(p.clients as unknown as { full_name: string })?.full_name}</span>
               </Link>
-              <span className={`text-sm px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#6B4408]"}`}>
+              <span className={`text-sm px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#F4C77A]"}`}>
                 {p.status === "final" ? "QA passed" : "Draft — review QA"}
               </span>
             </li>

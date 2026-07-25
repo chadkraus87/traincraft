@@ -97,7 +97,7 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
                         className={
                           selected
                             ? "flex items-center gap-2 text-sm px-2.5 py-1.5 rounded-md border-2 border-coral bg-coral/10 cursor-pointer"
-                            : "flex items-center gap-2 text-sm px-2.5 py-1.5 rounded-md border border-steel/30 bg-white cursor-pointer hover:border-coral"
+                            : "flex items-center gap-2 text-sm px-2.5 py-1.5 rounded-md border border-steel/30 bg-surface cursor-pointer hover:border-coral"
                         }
                       >
                         <input
