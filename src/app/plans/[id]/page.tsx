@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { LIMITATION_LABELS } from "@/lib/safety/rules";
 import DeliverButtons from "@/components/DeliverButtons";
+import DeletePlanButton from "@/components/DeletePlanButton";
 import type { PlanJson, QaReport } from "@/lib/types";
 
 export default async function PlanView({ params }: { params: Promise<{ id: string }> }) {
@@ -26,7 +27,10 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
             </span>
           </p>
         </div>
-        <DeliverButtons planId={planRow.id} hasEmail={!!client.email} hasPhone={!!client.phone} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <DeliverButtons planId={planRow.id} hasEmail={!!client.email} hasPhone={!!client.phone} />
+          <DeletePlanButton planId={planRow.id} clientId={client.id} planTitle={planRow.title} />
+        </div>
       </div>
 
       {qa && !qa.passed && (
