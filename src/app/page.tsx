@@ -55,17 +55,17 @@ export default async function Dashboard({
       </div>
 
       <div className="grid sm:grid-cols-3 gap-3">
-        <div className="bg-[#0D0C0A] rounded-xl p-4 flex flex-col items-center justify-center">
+        <div className="bg-signal rounded-xl p-4 flex flex-col items-center justify-center">
           <svg width="72" height="72" viewBox="0 0 72 72">
-            <circle cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#3A3A3A" strokeWidth="7" />
+            <circle cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#B87A1F" strokeWidth="7" />
             <circle
-              cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#EC6B3A" strokeWidth="7"
+              cx="36" cy="36" r={RING_RADIUS} fill="none" stroke="#1C1005" strokeWidth="7"
               strokeLinecap="round" strokeDasharray={RING_CIRCUMFERENCE} strokeDashoffset={ringOffset}
               transform="rotate(-90 36 36)"
             />
-            <text x="36" y="41" textAnchor="middle" fontSize="20" fontWeight="600" fill="#F5F1E8">{qaPassRate}%</text>
+            <text x="36" y="41" textAnchor="middle" fontSize="20" fontWeight="600" fill="#1C1005">{qaPassRate}%</text>
           </svg>
-          <p className="text-sm text-[#C9C4B8] mt-2">Plans QA-passed</p>
+          <p className="text-sm text-[#4A2410] mt-2">Plans QA-passed</p>
         </div>
         <div className="bg-coral rounded-xl p-4 flex flex-col justify-center">
           <p className="text-base text-[#4A2410]">Active clients</p>

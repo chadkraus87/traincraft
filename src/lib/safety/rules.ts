@@ -254,6 +254,10 @@ export const EQUIPMENT_TYPES = [
   "sled",
   "ski_erg",
   "battle_ropes",
+  "cable_machine",
+  "treadmill",
+  "stationary_bike",
+  "outdoor_bike",
   "full_gym",
 ] as const;
 
@@ -278,8 +282,8 @@ export const EXERCISE_CATEGORIES = [
 export const EQUIPMENT_GROUPS: { label: string; types: string[] }[] = [
   { label: "Free weights", types: ["dumbbell", "barbell", "kettlebell", "sandbag"] },
   { label: "Bodyweight & mat", types: ["yoga_mat", "suspension", "band"] },
-  { label: "Rig & stations", types: ["rack", "bench", "box", "pullup_bar", "landmine"] },
-  { label: "Cardio & conditioning", types: ["jump_rope", "rower", "ski_erg", "sled", "battle_ropes"] },
+  { label: "Rig & stations", types: ["rack", "bench", "box", "pullup_bar", "landmine", "cable_machine"] },
+  { label: "Cardio & conditioning", types: ["jump_rope", "rower", "ski_erg", "sled", "battle_ropes", "treadmill", "stationary_bike", "outdoor_bike"] },
   { label: "Other", types: ["medicine_ball", "full_gym"] },
 ];
 

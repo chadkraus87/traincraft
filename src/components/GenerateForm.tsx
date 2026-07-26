@@ -13,8 +13,8 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
   const router = useRouter();
   const [clientId, setClientId] = useState(defaultClient ?? clients[0]?.id ?? "");
   const [workoutType, setWorkoutType] = useState(workoutTypes[0]?.key ?? "");
-  const [weeks, setWeeks] = useState(4);
-  const [days, setDays] = useState(3);
+  const [weeks, setWeeks] = useState("4");
+  const [days, setDays] = useState("3");
   const [notes, setNotes] = useState("");
   const [showEquipment, setShowEquipment] = useState(false);
   const [extraEquipment, setExtraEquipment] = useState<string[]>([]);
@@ -34,7 +34,7 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientId, workoutType, weeks, daysPerWeek: days,
+          clientId, workoutType, weeks: Number(weeks) || 4, daysPerWeek: Number(days) || 3,
           extraInstructions: notes, extraEquipmentTypes: extraEquipment,
         }),
       });
@@ -67,9 +67,9 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
         </select></div>
       <div className="grid grid-cols-2 gap-3">
         <div><span className="label">Weeks</span>
-          <input type="number" min={1} max={12} className="input" value={weeks} onChange={(e) => setWeeks(+e.target.value)} /></div>
+          <input type="number" min={1} max={12} className="input" value={weeks} onChange={(e) => setWeeks(e.target.value)} /></div>
         <div><span className="label">Days / week</span>
-          <input type="number" min={1} max={6} className="input" value={days} onChange={(e) => setDays(+e.target.value)} /></div>
+          <input type="number" min={1} max={6} className="input" value={days} onChange={(e) => setDays(e.target.value)} /></div>
       </div>
       <div><span className="label">Trainer notes (optional)</span>
         <textarea rows={2} className="input" value={notes} onChange={(e) => setNotes(e.target.value)}
