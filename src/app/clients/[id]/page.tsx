@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { LIMITATION_TAGS, LIMITATION_LABELS, EQUIPMENT_TYPES } from "@/lib/safety/rules";
+import { LIMITATION_TAGS, LIMITATION_LABELS, EQUIPMENT_TYPES, equipmentLabel } from "@/lib/safety/rules";
 import { addLimitation, toggleLimitation, addEquipment, removeEquipment } from "../actions";
 import ClientEditPanel from "@/components/ClientEditPanel";
 
@@ -99,7 +99,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
             <input name="label" required className="input" placeholder='Label, e.g. "25 lb kettlebell"' />
             <div className="grid grid-cols-3 gap-2">
               <select name="equipment_type" className="input col-span-1">
-                {EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{t.replace("_", " ")}</option>)}
+                {EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{equipmentLabel(t)}</option>)}
               </select>
               <input name="quantity" type="number" min={1} defaultValue={1} className="input" placeholder="Qty" />
               <input name="weight_lb" type="number" step="0.5" className="input" placeholder="lb" />

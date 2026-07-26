@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { EQUIPMENT_GROUPS } from "@/lib/safety/rules";
+import { EQUIPMENT_GROUPS, equipmentLabel } from "@/lib/safety/rules";
 
 interface Props {
   clients: { id: string; full_name: string }[];
@@ -106,7 +106,7 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient }: P
                           onChange={() => toggleEquipment(t)}
                           className="shrink-0"
                         />
-                        {t.replace(/_/g, " ")}
+                        {equipmentLabel(t)}
                       </label>
                     );
                   })}

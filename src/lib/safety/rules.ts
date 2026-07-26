@@ -289,6 +289,14 @@ export const EQUIPMENT_GROUPS: { label: string; types: string[] }[] = [
   { label: "Other", types: ["medicine_ball", "full_gym"] },
 ];
 
+// A few equipment types have a common brand name trainers actually look
+// for — map those explicitly rather than relying on the generic
+// underscore-to-space formatting everywhere the list is displayed.
+export function equipmentLabel(type: string): string {
+  if (type === "suspension") return "suspension (TRX)";
+  return type.replace(/_/g, " ");
+}
+
 // ── Helper: resolve exclusions for a client ─────────────────────────────
 export interface ExerciseLike {
   id: string;
