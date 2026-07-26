@@ -36,7 +36,8 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
         <div>
           <h1 className="display text-3xl">{planRow.title}</h1>
           <p className="text-sm text-steel mt-1">
-            {client.full_name} · {planRow.weeks} weeks · {planRow.days_per_week} days/week ·{" "}
+            {client.full_name} ·{" "}
+            {planRow.is_single_workout ? "Single workout" : `${planRow.weeks} weeks · ${planRow.days_per_week} days/week`} ·{" "}
             <span className={planRow.status === "final" ? "text-success" : "text-[#F4C77A]"}>
               {planRow.status === "final" ? "QA passed" : "Draft — QA flagged issues below"}
             </span>
@@ -70,7 +71,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      <PlanEditor planId={planRow.id} initialPlan={plan} pool={usable} />
+      <PlanEditor planId={planRow.id} initialPlan={plan} pool={usable} isSingleWorkout={planRow.is_single_workout} />
     </div>
   );
 }

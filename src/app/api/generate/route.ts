@@ -1,5 +1,10 @@
 /**
  * POST /api/generate · orchestrates Builder -> QA -> retry -> persist.
+ * Handles both multi-week plans ("Build a Plan") and single one-off
+ * sessions ("Build a Workout") via the isSingleWorkout flag — when set,
+ * weeks/daysPerWeek are forced server-side to 1/1 regardless of what the
+ * client sent, since the shape of a single workout isn't something the
+ * browser should be trusted to dictate.
  * Failed QA on the retry still saves the plan as a draft with the QA report
  * attached, so the trainer sees exactly which checks failed.
  */
@@ -19,9 +24,21 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const body = await req.json();
-  const { clientId, workoutType, weeks = 4, daysPerWeek = 3, title, extraInstructions, extraEquipmentTypes } = body;
+  const {
+    clientId,
+    workoutType,
+    weeks: requestedWeeks = 4,
+    daysPerWeek: requestedDays = 3,
+    title,
+    extraInstructions,
+    extraEquipmentTypes,
+    isSingleWorkout,
+  } = body;
   if (!clientId || !WORKOUT_TYPES[workoutType])
     return NextResponse.json({ error: "clientId and valid workoutType required" }, { status: 400 });
+
+  const weeks = isSingleWorkout ? 1 : requestedWeeks;
+  const daysPerWeek = isSingleWorkout ? 1 : requestedDays;
 
   const [{ data: client }, { data: limitations }, { data: equipment }, { data: pool }] =
     await Promise.all([
@@ -54,12 +71,13 @@ export async function POST(req: Request) {
     weeks,
     daysPerWeek,
     extraInstructions,
+    isSingleWorkout: !!isSingleWorkout,
   };
 
   try {
     // Attempt 1
     let { plan, allowedPool } = await buildWorkout(input);
-    let qa = validatePlan(plan, allowedPool, limitationTags, workoutType, daysPerWeek, 1);
+    let qa = validatePlan(plan, allowedPool, limitationTags, workoutType, daysPerWeek, 1, !!isSingleWorkout);
 
     // One retry with failure feedback folded into trainer notes
     if (!qa.passed) {
@@ -68,25 +86,30 @@ export async function POST(req: Request) {
         ...input,
         extraInstructions: `${extraInstructions ?? ""}\nPREVIOUS ATTEMPT FAILED QA — fix these exactly: ${failures}`,
       });
-      const retryQa = validatePlan(retry.plan, retry.allowedPool, limitationTags, workoutType, daysPerWeek, 2);
+      const retryQa = validatePlan(retry.plan, retry.allowedPool, limitationTags, workoutType, daysPerWeek, 2, !!isSingleWorkout);
       if (retryQa.passed || countPasses(retryQa) >= countPasses(qa)) {
         plan = retry.plan;
         qa = retryQa;
       }
     }
 
+    const defaultTitle = isSingleWorkout
+      ? `${WORKOUT_TYPES[workoutType].label} workout — ${client.full_name}`
+      : `${WORKOUT_TYPES[workoutType].label} — ${client.full_name}`;
+
     const { data: saved, error } = await supabase
       .from("workout_plans")
       .insert({
         trainer_id: user.id,
         client_id: clientId,
-        title: title || `${WORKOUT_TYPES[workoutType].label} — ${client.full_name}`,
+        title: title || defaultTitle,
         workout_type: workoutType,
         weeks,
         days_per_week: daysPerWeek,
         status: qa.passed ? "final" : "draft",
         plan,
         qa_report: qa,
+        is_single_workout: !!isSingleWorkout,
       })
       .select("id")
       .single();

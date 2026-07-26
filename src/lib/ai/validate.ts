@@ -33,7 +33,8 @@ export function validatePlan(
   limitations: LimitationTag[],
   workoutType: keyof typeof WORKOUT_TYPES,
   daysPerWeek: number,
-  attempts = 1
+  attempts = 1,
+  isSingleWorkout = false
 ): QaReport {
   const checks: QaCheck[] = [];
   const poolById = new Map(allowedPool.map((e) => [e.id, e]));
@@ -136,16 +137,29 @@ export function validatePlan(
       : "Per-session exercise count and set volume within sane bounds.",
   });
 
-  // 7. Progression notes exist and mention a deload
+  // 7. Progression notes: a multi-week plan needs a real progression +
+  // deload scheme; a single one-off workout just needs a short note,
+  // not a multi-week periodization narrative.
   const prog = (plan.progression_notes ?? "").toLowerCase();
-  checks.push({
-    name: "progression_defined",
-    pass: prog.length > 80 && prog.includes("deload"),
-    detail:
-      prog.length > 80 && prog.includes("deload")
-        ? "Progression scheme with deload documented."
-        : "Progression notes are missing, too thin, or omit a deload week.",
-  });
+  if (isSingleWorkout) {
+    checks.push({
+      name: "progression_defined",
+      pass: prog.trim().length > 10,
+      detail:
+        prog.trim().length > 10
+          ? "Brief follow-up guidance included."
+          : "Missing a short note on what to adjust next time.",
+    });
+  } else {
+    checks.push({
+      name: "progression_defined",
+      pass: prog.length > 80 && prog.includes("deload"),
+      detail:
+        prog.length > 80 && prog.includes("deload")
+          ? "Progression scheme with deload documented."
+          : "Progression notes are missing, too thin, or omit a deload week.",
+    });
+  }
 
   return { passed: checks.every((c) => c.pass), checks, attempts };
 }

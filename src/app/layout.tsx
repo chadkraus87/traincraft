@@ -37,6 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/clients" className="hover:text-terracotta">Clients</Link>
                   <Link href="/exercises" className="hover:text-terracotta">Exercise library</Link>
                   <Link href="/plans/new" className="hover:text-terracotta">New plan</Link>
+                  <Link href="/workouts/new" className="hover:text-terracotta">New workout</Link>
                   <SignOutButton />
                 </>
               ) : (

@@ -8,6 +8,7 @@ interface Props {
   planId: string;
   initialPlan: PlanJson;
   pool: Exercise[]; // safety- and equipment-filtered for this client
+  isSingleWorkout?: boolean;
 }
 
 const emptyBlock = (ex: Exercise): PlanBlock => ({
@@ -20,7 +21,7 @@ const emptyBlock = (ex: Exercise): PlanBlock => ({
   coaching_note: "",
 });
 
-export default function PlanEditor({ planId, initialPlan, pool }: Props) {
+export default function PlanEditor({ planId, initialPlan, pool, isSingleWorkout }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [plan, setPlan] = useState<PlanJson>(initialPlan);
@@ -217,7 +218,7 @@ export default function PlanEditor({ planId, initialPlan, pool }: Props) {
       ))}
 
       <div className="card">
-        <h2 className="display text-lg mb-2">Progression</h2>
+        <h2 className="display text-lg mb-2">{isSingleWorkout ? "Next time" : "Progression"}</h2>
         <p className="text-sm whitespace-pre-wrap">{plan.progression_notes}</p>
       </div>
 

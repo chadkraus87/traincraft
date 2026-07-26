@@ -258,6 +258,8 @@ export const EQUIPMENT_TYPES = [
   "treadmill",
   "stationary_bike",
   "outdoor_bike",
+  "foam_roller",
+  "stability_ball",
   "full_gym",
 ] as const;
 
@@ -281,7 +283,7 @@ export const EXERCISE_CATEGORIES = [
 // EQUIPMENT_TYPES must appear in exactly one group here.
 export const EQUIPMENT_GROUPS: { label: string; types: string[] }[] = [
   { label: "Free weights", types: ["dumbbell", "barbell", "kettlebell", "sandbag"] },
-  { label: "Bodyweight & mat", types: ["yoga_mat", "suspension", "band"] },
+  { label: "Bodyweight & mat", types: ["yoga_mat", "suspension", "band", "foam_roller", "stability_ball"] },
   { label: "Rig & stations", types: ["rack", "bench", "box", "pullup_bar", "landmine", "cable_machine"] },
   { label: "Cardio & conditioning", types: ["jump_rope", "rower", "ski_erg", "sled", "battle_ropes", "treadmill", "stationary_bike", "outdoor_bike"] },
   { label: "Other", types: ["medicine_ball", "full_gym"] },

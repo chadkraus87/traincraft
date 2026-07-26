@@ -28,6 +28,7 @@ export interface BuildInput {
   workoutType: keyof typeof WORKOUT_TYPES;
   weeks: number;
   daysPerWeek: number;
+  isSingleWorkout?: boolean;
   extraInstructions?: string;
 }
 
@@ -101,13 +102,25 @@ NON-NEGOTIABLE FOR THIS SPECIFIC PLAN — check both before you respond:
 2. If you include ANY push_horizontal or push_vertical exercise, total pulling sets (pull_horizontal + pull_vertical) must be >= total pushing sets (minimum ratio ${wt.balance.pullToPushMin}). Add up your own sets before responding — if pulling is short, add or increase a pulling exercise now.
 Re-read your planned sessions against these two rules before writing your final answer. A plan that skips a required pattern or shorts pulling volume will be rejected.
 
-OUTPUT: respond with ONLY a JSON object (no markdown fences, no other
+`;
+
+  const singleWorkoutOutput = `OUTPUT: respond with ONLY a JSON object (no markdown fences, no other
+text) matching:
+{
+  "sessions": [{ "day": 1, "focus": "string", "blocks": [{ "exercise_id": "uuid", "name": "string", "sets": 3, "reps": "8-10", "load_note": "string", "rest_sec": 90, "coaching_note": "string" }] }],
+  "progression_notes": "brief guidance for next time this client trains this focus — what to adjust up or down, plain text, 1-2 sentences"
+}
+This is a single one-off workout, not a multi-week program — produce exactly ONE session in the sessions array (day 1 only). progression_notes should be short: a note for the trainer on what to adjust if they program a similar session again, not a multi-week periodization scheme.`;
+
+  const multiWeekOutput = `OUTPUT: respond with ONLY a JSON object (no markdown fences, no other
 text) matching:
 {
   "sessions": [{ "day": 1, "focus": "string", "blocks": [{ "exercise_id": "uuid", "name": "string", "sets": 3, "reps": "8-10", "load_note": "string", "rest_sec": 90, "coaching_note": "string" }] }],
   "progression_notes": "week-over-week progression + deload guidance, plain text"
 }
 Program ONE template week (${input.daysPerWeek} sessions); progression_notes explains how weeks 2-${input.weeks} evolve.`;
+
+  const fullSystem = system + (input.isSingleWorkout ? singleWorkoutOutput : multiWeekOutput);
 
   const user = `CLIENT
 Name: ${client.full_name}
@@ -127,7 +140,7 @@ ${poolLines}`;
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 8000,
-    system,
+    system: fullSystem,
     messages: [{ role: "user", content: user }],
   });
 

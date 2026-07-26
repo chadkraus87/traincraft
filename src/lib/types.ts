@@ -79,6 +79,7 @@ export interface WorkoutPlan {
   plan: PlanJson;
   qa_report: QaReport | null;
   created_at: string;
+  is_single_workout: boolean;
 }
 
 export interface QaCheck {
