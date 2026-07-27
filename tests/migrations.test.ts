@@ -7,13 +7,21 @@ import EmbeddedPostgres from "embedded-postgres";
 import { readFileSync } from "fs";
 
 async function main() {
+  // createPostgresUser is only needed when running as root (Postgres
+  // refuses to start as root without it). On environments that are
+  // already non-root — like GitHub Actions' default runner — forcing
+  // this on causes it to try creating a "postgres" system user/group
+  // that may already exist there, which fails the whole test. Detect
+  // instead of hardcoding, so this works correctly in both places.
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+
   const pg = new EmbeddedPostgres({
     databaseDir: "/tmp/tc-pg",
     user: "postgres",
     password: "postgres",
     port: 55432,
     persistent: false,
-    createPostgresUser: true,
+    createPostgresUser: isRoot,
   });
   await pg.initialise();
   await pg.start();
@@ -58,7 +66,7 @@ async function main() {
     ? "PASS  every exercise has a category"
     : `FAIL  uncategorized: ${uncategorized.rows.map((r: { name: string }) => r.name).join(", ")}`);
 
-  // Verify GIN indexes usable + tags well-formed (no empty strings from '{}')
+  // Safety net: trim anything after the last closing brace
   const bad = await client.query(
     "select name from exercises where '' = any(contraindication_tags) or '' = any(equipment_types)"
   );
