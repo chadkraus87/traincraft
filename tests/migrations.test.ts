@@ -31,13 +31,32 @@ async function main() {
 
   const m1 = readFileSync("supabase/migrations/0001_schema.sql", "utf8");
   const m2 = readFileSync("supabase/migrations/0002_seed_exercises.sql", "utf8");
+  const m3 = readFileSync("supabase/migrations/0003_expand_exercise_library.sql", "utf8");
+  const m4 = readFileSync("supabase/migrations/0004_add_exercise_category.sql", "utf8");
+  const m5 = readFileSync("supabase/migrations/0005_isolation_and_cardio_machines.sql", "utf8");
+  const m6 = readFileSync("supabase/migrations/0006_add_single_workout_flag.sql", "utf8");
+  const m7 = readFileSync("supabase/migrations/0007_functional_and_conditioning_batch.sql", "utf8");
+  const m8 = readFileSync("supabase/migrations/0008_ace_style_expansion.sql", "utf8");
+  const m9 = readFileSync("supabase/migrations/0009_exercise_logs.sql", "utf8");
   await client.query(m1);
   console.log("PASS  0001_schema.sql applied");
   await client.query(m2);
+  await client.query(m3);
+  await client.query(m4);
+  await client.query(m5);
+  await client.query(m6);
+  await client.query(m7);
+  await client.query(m8);
+  await client.query(m9);
   const { rows } = await client.query(
-    "select count(*)::int as n, count(distinct pattern)::int as patterns from exercises"
+    "select count(*)::int as n, count(distinct pattern)::int as patterns, count(distinct category)::int as categories from exercises"
   );
-  console.log(`PASS  0002_seed applied — ${rows[0].n} exercises, ${rows[0].patterns} movement patterns`);
+  console.log(`PASS  0002 through 0009 applied — ${rows[0].n} exercises, ${rows[0].patterns} patterns, ${rows[0].categories} categories`);
+
+  const uncategorized = await client.query("select name from exercises where category is null");
+  console.log(uncategorized.rows.length === 0
+    ? "PASS  every exercise has a category"
+    : `FAIL  uncategorized: ${uncategorized.rows.map((r: { name: string }) => r.name).join(", ")}`);
 
   // Verify GIN indexes usable + tags well-formed (no empty strings from '{}')
   const bad = await client.query(

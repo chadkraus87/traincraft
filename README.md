@@ -1,5 +1,7 @@
 # TrainCraft — Client & Workout Management for Personal Trainers
 
+![CI](https://github.com/chadkraus87/traincraft/actions/workflows/ci.yml/badge.svg)
+
 Single-trainer app: manage clients (goals, injuries, home equipment), generate
 safe AI workout plans or single workouts, and deliver them by PDF or your
 device's own mail/share flow. The client never logs in — they receive plans.
@@ -76,7 +78,15 @@ The LLM is never the last line of defense:
   whatever account the trainer is already using) with a desktop fallback
   that downloads the PDF and opens the default mail app with the client's
   address and a short message pre-filled. No server-side email credential
-  is used or stored for this.
+  is used or stored for this. A trainer-confirmed "mark as sent" logs to
+  the existing `deliveries` table — explicitly self-attested, since the
+  app has no way to detect whether a share-sheet or mailto send actually
+  completed.
+- **Progress tracking**: optional per-exercise logging (weight, reps, RPE,
+  notes) right on the plan view. Recent logs feed back into future
+  generations — the builder prompt includes a client's real recent
+  performance so load suggestions are grounded in what actually happened
+  last time, not a generic placeholder.
 - **Dashboard**: QA-pass-rate ring, active client count, plans-built-this-
   week, recent plans list, ambient background artwork.
 
@@ -88,7 +98,7 @@ The LLM is never the last line of defense:
    `0005_isolation_and_cardio_machines.sql` →
    `0006_add_single_workout_flag.sql` →
    `0007_functional_and_conditioning_batch.sql` →
-   `0008_ace_style_expansion.sql`.
+   `0008_ace_style_expansion.sql` → `0009_exercise_logs.sql`.
 2. In Supabase → Authentication → Sign In / Providers → Email:
    - Leave **Confirm email** off (account creation completes without a
      click-to-confirm step).
@@ -116,10 +126,27 @@ in `src/components/DeliverButtons.tsx`.
 - `npm test` — safety engine + QA validator unit tests, PDF render with
   content verification, builder pool-guard, and an audit that every
   contraindication tag used across all exercise-seed migrations is
-  actually enforced by a rule.
-- `npm run test:db` — applies all eight migrations to an embedded real
+  actually enforced by a rule. Runs in CI on every push.
+- `npm run test:db` — applies all nine migrations to an embedded real
   Postgres instance (auth schema stubbed) and verifies seed integrity,
-  category coverage, and RLS coverage.
+  category coverage, and RLS coverage. Runs in CI on every push.
+- `npm run test:e2e` — real browser end-to-end test (Playwright) covering
+  the actual user path: sign in, generate a plan against the real safety
+  pipeline and real Claude API, edit it, confirm QA review, verify the PDF
+  link. **Not run in CI** — it needs real Supabase + Anthropic credentials
+  and a real signed-in test account, which would mean putting live
+  credentials in GitHub Actions secrets. Run it locally against your dev
+  environment:
+  ```
+  E2E_EMAIL=you@example.com E2E_PASSWORD=yourpassword npm run test:e2e
+  ```
+  It creates a clearly-named throwaway client ("E2E Test Client …") and a
+  real plan (using real Anthropic credit), then deletes both at the end.
+  If it fails partway through, check for leftover "E2E Test Client"
+  entries and delete manually. Wiring this into CI would require a
+  dedicated test Supabase project so it never touches real data — a
+  reasonable next step, not done here to avoid needing a second Supabase
+  project just for testing.
 - Ad hoc verification scripts (not part of `npm test`, run manually when
   adding large exercise batches): a real-database duplicate-name check
   across the full library, and an equipment-coverage audit confirming

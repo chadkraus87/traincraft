@@ -2,10 +2,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveEditedPlan } from "@/app/plans/actions";
+import ExerciseLogRow from "@/components/ExerciseLogRow";
 import type { Exercise, PlanBlock, PlanJson } from "@/lib/types";
 
 interface Props {
   planId: string;
+  clientId: string;
   initialPlan: PlanJson;
   pool: Exercise[]; // safety- and equipment-filtered for this client
   isSingleWorkout?: boolean;
@@ -21,7 +23,7 @@ const emptyBlock = (ex: Exercise): PlanBlock => ({
   coaching_note: "",
 });
 
-export default function PlanEditor({ planId, initialPlan, pool, isSingleWorkout }: Props) {
+export default function PlanEditor({ planId, clientId, initialPlan, pool, isSingleWorkout }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [plan, setPlan] = useState<PlanJson>(initialPlan);
@@ -146,6 +148,7 @@ export default function PlanEditor({ planId, initialPlan, pool, isSingleWorkout 
                       <>
                         {b.name}
                         {b.coaching_note && <p className="text-xs text-steel">{b.coaching_note}</p>}
+                        <ExerciseLogRow clientId={clientId} exerciseId={b.exercise_id} planId={planId} />
                       </>
                     ) : (
                       <div className="space-y-1">

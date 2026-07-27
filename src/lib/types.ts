@@ -25,6 +25,18 @@ export interface EquipmentItem {
   weight_lb: number | null;
 }
 
+export interface ExerciseLog {
+  id: string;
+  client_id: string;
+  exercise_id: string;
+  plan_id: string | null;
+  performed_at: string;
+  weight_used: string | null;
+  reps_completed: string | null;
+  rpe: number | null;
+  notes: string | null;
+}
+
 export interface Exercise {
   id: string;
   trainer_id: string | null;

@@ -49,6 +49,26 @@ export async function POST(req: Request) {
     ]);
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
+  // Recent logged performance for this client, so the builder can ground
+  // load suggestions in what actually happened last time instead of a
+  // generic placeholder. Optional — most clients won't have any logs yet.
+  const { data: recentLogs } = await supabase
+    .from("exercise_logs")
+    .select("performed_at, weight_used, reps_completed, rpe, exercises(name)")
+    .eq("client_id", clientId)
+    .order("performed_at", { ascending: false })
+    .limit(20);
+
+  const recentPerformanceText = (recentLogs ?? [])
+    .filter((l) => l.weight_used || l.reps_completed)
+    .map((l) => {
+      const exName = (l.exercises as unknown as { name: string } | null)?.name ?? "Unknown exercise";
+      const date = new Date(l.performed_at).toLocaleDateString();
+      const parts = [l.weight_used, l.reps_completed, l.rpe ? `RPE ${l.rpe}` : null].filter(Boolean);
+      return `- ${exName} (${date}): ${parts.join(", ")}`;
+    })
+    .join("\n");
+
   // Equipment picked in the "consider additional equipment" toggle is
   // ephemeral — used for this generation only, never written to the
   // client's saved equipment record.
@@ -72,6 +92,7 @@ export async function POST(req: Request) {
     daysPerWeek,
     extraInstructions,
     isSingleWorkout: !!isSingleWorkout,
+    recentPerformance: recentPerformanceText || undefined,
   };
 
   try {

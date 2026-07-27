@@ -32,6 +32,66 @@ export async function deletePlan(form: FormData) {
  * only edits the *review record* — it never touches which exercises are
  * actually in the plan, so it can't be used to bypass the safety engine.
  */
+/**
+ * Logs what a client actually did for one exercise — optional, never
+ * blocks anything else. This is what lets future generations reference
+ * real history instead of a generic placeholder load.
+ */
+/**
+ * Records that the trainer confirms they actually sent a plan. This is
+ * explicitly trainer-attested, not automatically detected — since
+ * delivery now happens through the trainer's own device (Web Share API /
+ * mailto), the app has no way to know whether a share sheet action or a
+ * mail app send actually completed. Honest audit trail, not a claim of
+ * verified delivery.
+ */
+export async function confirmDeliverySent(planId: string, channel: "email", destination: string) {
+  const supabase = await supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  await supabase.from("deliveries").insert({
+    trainer_id: user.id,
+    plan_id: planId,
+    channel,
+    destination,
+    status: "sent",
+  });
+
+  revalidatePath(`/plans/${planId}`);
+}
+
+export async function logExercisePerformance(input: {
+  clientId: string;
+  exerciseId: string;
+  planId: string | null;
+  weightUsed: string;
+  repsCompleted: string;
+  rpe: string;
+  notes: string;
+}) {
+  const supabase = await supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  await supabase.from("exercise_logs").insert({
+    trainer_id: user.id,
+    client_id: input.clientId,
+    exercise_id: input.exerciseId,
+    plan_id: input.planId,
+    weight_used: input.weightUsed || null,
+    reps_completed: input.repsCompleted || null,
+    rpe: input.rpe ? Number(input.rpe) : null,
+    notes: input.notes || null,
+  });
+
+  if (input.planId) revalidatePath(`/plans/${input.planId}`);
+}
+
 export async function saveQaReview(planId: string, report: QaReport) {
   const supabase = await supabaseServer();
   const {

@@ -30,6 +30,12 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
   const ownedTypes = (equipment ?? []).map((e) => e.equipment_type);
   const { usable } = filterForEquipment(allowed, ownedTypes);
 
+  const { data: deliveries } = await supabase
+    .from("deliveries")
+    .select("*")
+    .eq("plan_id", planRow.id)
+    .order("created_at", { ascending: false });
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -71,7 +77,21 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      <PlanEditor planId={planRow.id} initialPlan={plan} pool={usable} isSingleWorkout={planRow.is_single_workout} />
+      <PlanEditor planId={planRow.id} clientId={client.id} initialPlan={plan} pool={usable} isSingleWorkout={planRow.is_single_workout} />
+
+      {(deliveries ?? []).length > 0 && (
+        <div className="card">
+          <h2 className="display text-lg mb-2">Delivery history</h2>
+          <p className="text-xs text-steel mb-2">Trainer-confirmed — the app can't automatically detect whether an email actually sent.</p>
+          <ul className="text-sm space-y-1">
+            {(deliveries ?? []).map((d) => (
+              <li key={d.id} className="text-steel">
+                {d.channel} to {d.destination} · {new Date(d.created_at).toLocaleString()}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

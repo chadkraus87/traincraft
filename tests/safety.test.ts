@@ -49,6 +49,7 @@ const mk = (over: Partial<Exercise>): Exercise => ({
   name: "X",
   description: "",
   pattern: "squat",
+  category: "Foundational strength",
   muscle_groups: ["quads"],
   equipment_types: ["bodyweight"],
   difficulty: "beginner",
@@ -89,7 +90,8 @@ const squat = mk({ name: "Goblet Squat", equipment_types: ["kettlebell"] });
 
 // ── QA validator: a compliant plan passes ───────────────────────────────
 const pool: Exercise[] = [
-  mk({ name: "Goblet Squat", pattern: "squat", equipment_types: ["kettlebell"] }),
+  mk({ name: "Goblet Squat", pattern: "squat",
+  category: "Foundational strength", equipment_types: ["kettlebell"] }),
   mk({ name: "KB Deadlift", pattern: "hinge", equipment_types: ["kettlebell"] }),
   mk({ name: "Push-Up", pattern: "push_horizontal" }),
   mk({ name: "Banded Row", pattern: "pull_horizontal", equipment_types: ["band"] }),

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { confirmDeliverySent } from "@/app/plans/actions";
 
 /**
  * Plan delivery, redesigned to never send email from a stored server
@@ -11,14 +12,11 @@ import { useState } from "react";
  *  - Desktop fallback (Web Share API for files isn't universally
  *    supported): downloads the PDF and opens the default mail app with
  *    the client's address, subject, and a short message pre-filled.
- *    Browsers don't allow a mailto: link to pre-attach a file — that's a
- *    platform restriction, not something this app can work around — so
- *    the one manual step left is dragging the downloaded PDF into the
- *    compose window that opens.
  *
- * Trade-off: because sending now happens entirely in the trainer's own
- * mail client, the app can no longer confirm delivery or log it — there's
- * no more automatic "deliveries" record for this action.
+ * Delivery confirmation is explicitly trainer-attested: after the share
+ * sheet or mail app opens, the app has no way to actually know whether the
+ * send completed, so it asks the trainer to confirm rather than pretending
+ * to auto-detect something it can't see.
  */
 export default function DeliverButtons({
   planId,
@@ -33,6 +31,8 @@ export default function DeliverButtons({
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [awaitingConfirm, setAwaitingConfirm] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   const pdfUrl = `/api/plans/${planId}/pdf`;
   const fileName = `${planTitle}.pdf`;
@@ -70,6 +70,7 @@ export default function DeliverButtons({
         window.location.href = mailto;
         setStatus("PDF downloaded — attach it in the mail window that just opened.");
       }
+      setAwaitingConfirm(true);
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
         setStatus(null); // trainer closed the share sheet — not an error
@@ -80,18 +81,38 @@ export default function DeliverButtons({
     setBusy(false);
   };
 
+  const confirmSent = async () => {
+    await confirmDeliverySent(planId, "email", clientEmail ?? "unknown");
+    setAwaitingConfirm(false);
+    setConfirmed(true);
+  };
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <a className="btn-ghost" href={pdfUrl}>Download PDF</a>
-      <button
-        className="btn-ghost"
-        onClick={emailToClient}
-        disabled={busy}
-        title={clientEmail ? "" : "No email on file — you'll need to enter one when your mail app opens"}
-      >
-        {busy ? "Preparing…" : "Email to client"}
-      </button>
-      {status && <span className="text-xs text-steel">{status}</span>}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <a className="btn-ghost" href={pdfUrl}>Download PDF</a>
+        <button
+          className="btn-ghost"
+          onClick={emailToClient}
+          disabled={busy}
+          title={clientEmail ? "" : "No email on file — you'll need to enter one when your mail app opens"}
+        >
+          {busy ? "Preparing…" : "Email to client"}
+        </button>
+        {status && <span className="text-xs text-steel">{status}</span>}
+      </div>
+      {awaitingConfirm && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-steel">Did that actually send?</span>
+          <button type="button" className="text-coral underline" onClick={confirmSent}>
+            Yes, mark as sent
+          </button>
+          <button type="button" className="text-steel underline" onClick={() => setAwaitingConfirm(false)}>
+            Not yet
+          </button>
+        </div>
+      )}
+      {confirmed && <p className="text-xs text-success">Marked as sent ✓</p>}
     </div>
   );
 }

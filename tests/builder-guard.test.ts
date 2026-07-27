@@ -5,6 +5,7 @@ import type { Client, Exercise } from "../src/lib/types";
 const client: Client = { id: "c", full_name: "T", email: null, phone: null, goals: null, training_history: null, is_remote: true };
 const tinyPool: Exercise[] = [{
   id: "1", trainer_id: null, name: "Push-Up", description: "", pattern: "push_horizontal",
+  category: "Foundational strength",
   muscle_groups: ["chest"], equipment_types: ["bodyweight"], difficulty: "beginner",
   cues: null, contraindication_tags: [], unilateral: false,
 }];
