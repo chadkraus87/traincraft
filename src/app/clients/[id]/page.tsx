@@ -2,20 +2,48 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { LIMITATION_TAGS, LIMITATION_LABELS, EQUIPMENT_TYPES, equipmentLabel } from "@/lib/safety/rules";
-import { addLimitation, toggleLimitation, addEquipment, removeEquipment } from "../actions";
+import { addLimitation, toggleLimitation, addEquipment, removeEquipment, addClientNote } from "../actions";
 import ClientEditPanel from "@/components/ClientEditPanel";
+import NoteRow from "@/components/NoteRow";
 
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await supabaseServer();
-  const [{ data: client }, { data: limitations }, { data: equipment }, { data: plans }] =
+  const [{ data: client }, { data: limitations }, { data: equipment }, { data: plans }, { data: logs }, { data: notes }] =
     await Promise.all([
       supabase.from("clients").select("*").eq("id", id).single(),
       supabase.from("client_limitations").select("*").eq("client_id", id).order("created_at"),
       supabase.from("client_equipment").select("*").eq("client_id", id).order("created_at"),
       supabase.from("workout_plans").select("id,title,status,created_at").eq("client_id", id).order("created_at", { ascending: false }),
+      supabase.from("exercise_logs").select("id, performed_at, weight_used, reps_completed, rpe, exercises(name)")
+        .eq("client_id", id).order("performed_at", { ascending: false }).limit(100),
+      supabase.from("client_notes").select("*").eq("client_id", id).order("created_at", { ascending: false }),
     ]);
   if (!client) notFound();
+
+  // Group logs by exercise name for the training-history view. Best-effort
+  // numeric extraction from weight_used (free text — "25 lb", "bodyweight",
+  // etc.) gives a simple up/down/flat trend when it parses cleanly;
+  // otherwise no trend indicator shows rather than guessing.
+  const numericWeight = (s: string | null) => {
+    const m = s?.match(/(\d+(\.\d+)?)/);
+    return m ? parseFloat(m[1]) : null;
+  };
+  type LogRow = { id: string; performed_at: string; weight_used: string | null; reps_completed: string | null; rpe: number | null; exercises: { name: string } | null };
+  const logsByExercise = new Map<string, LogRow[]>();
+  for (const log of (logs ?? []) as unknown as LogRow[]) {
+    const name = log.exercises?.name ?? "Unknown exercise";
+    if (!logsByExercise.has(name)) logsByExercise.set(name, []);
+    logsByExercise.get(name)!.push(log);
+  }
+  const exerciseHistory = [...logsByExercise.entries()].map(([name, entries]) => {
+    const oldest = numericWeight(entries[entries.length - 1].weight_used);
+    const newest = numericWeight(entries[0].weight_used);
+    const trend = oldest !== null && newest !== null && entries.length > 1
+      ? newest > oldest ? "up" : newest < oldest ? "down" : "flat"
+      : null;
+    return { name, entries, trend };
+  });
 
   return (
     <div className="space-y-6">
@@ -120,6 +148,43 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                 {p.status === "final" ? "QA passed" : "Draft"}
               </span>
             </li>
+          ))}
+        </ul>
+      </div>
+      <div className="card">
+        <h2 className="display text-lg mb-3">Training history</h2>
+        {exerciseHistory.length === 0 && <p className="text-sm text-steel">No logged sets yet — log what actually happened from any plan page.</p>}
+        <div className="space-y-3">
+          {exerciseHistory.map(({ name, entries, trend }) => (
+            <div key={name} className="border-b border-steel/10 pb-2 last:border-0">
+              <p className="text-sm font-medium">
+                {name}
+                {trend === "up" && <span className="text-success ml-1.5">↑ trending up</span>}
+                {trend === "down" && <span className="text-alarm ml-1.5">↓ trending down</span>}
+                {trend === "flat" && <span className="text-steel ml-1.5">→ steady</span>}
+              </p>
+              <ul className="text-xs text-steel mt-1 space-y-0.5">
+                {entries.slice(0, 5).map((e) => (
+                  <li key={e.id}>
+                    {new Date(e.performed_at).toLocaleDateString()} — {[e.weight_used, e.reps_completed, e.rpe ? `RPE ${e.rpe}` : null].filter(Boolean).join(", ") || "logged"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card">
+        <h2 className="display text-lg mb-3">Notes</h2>
+        <form action={addClientNote} className="flex gap-2 mb-3">
+          <input type="hidden" name="client_id" value={client.id} />
+          <input name="note" className="input" placeholder="Anything worth remembering — sleep, nutrition, how they're feeling…" />
+          <button className="btn-ghost shrink-0">Add note</button>
+        </form>
+        {(notes ?? []).length === 0 && <p className="text-sm text-steel">No notes yet.</p>}
+        <ul className="space-y-2">
+          {(notes ?? []).map((n) => (
+            <NoteRow key={n.id} id={n.id} clientId={client.id} note={n.note} createdAt={n.created_at} />
           ))}
         </ul>
       </div>

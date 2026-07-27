@@ -69,6 +69,20 @@ export async function POST(req: Request) {
     })
     .join("\n");
 
+  // Recent trainer notes (nutrition, sleep, how they're feeling, etc.) —
+  // context that isn't tied to a specific exercise but is still worth the
+  // builder knowing about.
+  const { data: recentNotes } = await supabase
+    .from("client_notes")
+    .select("note, created_at")
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const recentNotesText = (recentNotes ?? [])
+    .map((n) => `- (${new Date(n.created_at).toLocaleDateString()}) ${n.note}`)
+    .join("\n");
+
   // Equipment picked in the "consider additional equipment" toggle is
   // ephemeral — used for this generation only, never written to the
   // client's saved equipment record.
@@ -93,6 +107,7 @@ export async function POST(req: Request) {
     extraInstructions,
     isSingleWorkout: !!isSingleWorkout,
     recentPerformance: recentPerformanceText || undefined,
+    recentNotes: recentNotesText || undefined,
   };
 
   try {

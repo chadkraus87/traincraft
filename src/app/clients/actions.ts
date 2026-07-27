@@ -92,3 +92,34 @@ export async function removeEquipment(form: FormData) {
   await supabase.from("client_equipment").delete().eq("id", String(form.get("id")));
   revalidatePath(`/clients/${clientId}`);
 }
+
+export async function addClientNote(form: FormData) {
+  const { supabase, userId } = await uid();
+  const clientId = String(form.get("client_id"));
+  const note = String(form.get("note") || "").trim();
+  if (!note) return;
+  await supabase.from("client_notes").insert({
+    trainer_id: userId,
+    client_id: clientId,
+    note,
+  });
+  revalidatePath(`/clients/${clientId}`);
+}
+
+export async function updateClientNote(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  const noteId = String(form.get("id"));
+  const note = String(form.get("note") || "").trim();
+  if (!note) return;
+  await supabase.from("client_notes").update({ note }).eq("id", noteId);
+  revalidatePath(`/clients/${clientId}`);
+}
+
+export async function deleteClientNote(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  const noteId = String(form.get("id"));
+  await supabase.from("client_notes").delete().eq("id", noteId);
+  revalidatePath(`/clients/${clientId}`);
+}

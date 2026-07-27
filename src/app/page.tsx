@@ -23,6 +23,7 @@ export default async function Dashboard({
   }
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const staleThreshold = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
 
   const [
     { count: clients },
@@ -30,6 +31,8 @@ export default async function Dashboard({
     { count: passedPlans },
     { count: plansThisWeek },
     { data: recent },
+    { data: allClients },
+    { data: allPlanDates },
   ] = await Promise.all([
     supabase.from("clients").select("*", { count: "exact", head: true }),
     supabase.from("workout_plans").select("*", { count: "exact", head: true }),
@@ -37,7 +40,19 @@ export default async function Dashboard({
     supabase.from("workout_plans").select("*", { count: "exact", head: true }).gte("created_at", weekAgo),
     supabase.from("workout_plans").select("id,title,status,created_at,clients(full_name)")
       .order("created_at", { ascending: false }).limit(5),
+    supabase.from("clients").select("id, full_name"),
+    supabase.from("workout_plans").select("client_id, created_at").order("created_at", { ascending: false }),
   ]);
+
+  // "Needs a new plan" — clients with no plan in 4+ weeks, or none at all.
+  // No new schema needed; computed from created_at already on every plan.
+  const lastPlanByClient = new Map<string, string>();
+  for (const p of allPlanDates ?? []) {
+    if (!lastPlanByClient.has(p.client_id)) lastPlanByClient.set(p.client_id, p.created_at);
+  }
+  const staleClients = (allClients ?? [])
+    .map((c) => ({ ...c, lastPlan: lastPlanByClient.get(c.id) }))
+    .filter((c) => !c.lastPlan || new Date(c.lastPlan) < staleThreshold);
 
   const qaPassRate = plans && plans > 0 ? Math.round(((passedPlans ?? 0) / plans) * 100) : 0;
   const ringOffset = RING_CIRCUMFERENCE * (1 - qaPassRate / 100);
@@ -47,6 +62,23 @@ export default async function Dashboard({
       {welcome === "1" && (
         <div className="border-l-4 border-coral bg-coral/10 text-coral px-4 py-3 rounded-r-md text-sm">
           Account created — you're all set.
+        </div>
+      )}
+
+      {staleClients.length > 0 && (
+        <div className="border-l-4 border-signal bg-signal/10 px-4 py-3 rounded-r-md text-sm">
+          <p className="font-medium text-[#4A2410] mb-1">
+            {staleClients.length} client{staleClients.length > 1 ? "s haven't" : " hasn't"} had a new plan in 4+ weeks
+          </p>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1">
+            {staleClients.map((c) => (
+              <li key={c.id}>
+                <Link href={`/plans/new?client=${c.id}`} className="text-coral underline">
+                  {c.full_name}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <div>
@@ -107,6 +139,12 @@ export default async function Dashboard({
             </li>
           ))}
         </ul>
+      </div>
+
+      <div className="text-center">
+        <a href="/api/export" className="text-xs text-steel underline">
+          Download a full backup of your data (JSON)
+        </a>
       </div>
     </div>
   );

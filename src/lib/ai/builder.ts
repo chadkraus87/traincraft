@@ -30,6 +30,7 @@ export interface BuildInput {
   daysPerWeek: number;
   isSingleWorkout?: boolean;
   recentPerformance?: string;
+  recentNotes?: string;
   extraInstructions?: string;
 }
 
@@ -135,6 +136,7 @@ ${equipLines}
 WORKOUT TYPE: ${wt.label} · ${input.daysPerWeek} days/week · ${input.weeks} weeks
 ${input.extraInstructions ? `TRAINER NOTES: ${input.extraInstructions}` : ""}
 ${input.recentPerformance ? `\nRECENT LOGGED PERFORMANCE for this client (use this to ground load/rep suggestions in reality instead of guessing — if an exercise below was recently logged, base its load_note on what they actually did, progressing sensibly from it):\n${input.recentPerformance}` : ""}
+${input.recentNotes ? `\nRECENT TRAINER NOTES on this client (context only — sleep, nutrition, how they're feeling; use judgment about whether it should affect today's session):\n${input.recentNotes}` : ""}
 
 ALLOWED EXERCISE POOL (the only exercises you may use):
 ${poolLines}`;

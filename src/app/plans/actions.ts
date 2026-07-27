@@ -92,6 +92,33 @@ export async function logExercisePerformance(input: {
   if (input.planId) revalidatePath(`/plans/${input.planId}`);
 }
 
+/**
+ * Saves the current structure of a plan as a reusable template. Templates
+ * store the same PlanJson shape as a real plan — applying one to a client
+ * later re-runs the full safety filter and QA validator against that
+ * specific client, so a template built for one person can't silently
+ * carry over something unsafe for someone else.
+ */
+export async function saveAsTemplate(planId: string, name: string) {
+  const supabase = await supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  const { data: planRow } = await supabase.from("workout_plans").select("*").eq("id", planId).single();
+  if (!planRow) throw new Error("Plan not found");
+
+  await supabase.from("plan_templates").insert({
+    trainer_id: user.id,
+    name,
+    workout_type: planRow.workout_type,
+    weeks: planRow.weeks,
+    days_per_week: planRow.days_per_week,
+    plan: planRow.plan,
+  });
+}
+
 export async function saveQaReview(planId: string, report: QaReport) {
   const supabase = await supabaseServer();
   const {

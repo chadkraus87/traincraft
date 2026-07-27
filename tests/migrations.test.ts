@@ -46,6 +46,8 @@ async function main() {
   const m7 = readFileSync("supabase/migrations/0007_functional_and_conditioning_batch.sql", "utf8");
   const m8 = readFileSync("supabase/migrations/0008_ace_style_expansion.sql", "utf8");
   const m9 = readFileSync("supabase/migrations/0009_exercise_logs.sql", "utf8");
+  const m10 = readFileSync("supabase/migrations/0010_client_notes.sql", "utf8");
+  const m11 = readFileSync("supabase/migrations/0011_plan_templates.sql", "utf8");
   await client.query(m1);
   console.log("PASS  0001_schema.sql applied");
   await client.query(m2);
@@ -56,17 +58,19 @@ async function main() {
   await client.query(m7);
   await client.query(m8);
   await client.query(m9);
+  await client.query(m10);
+  await client.query(m11);
   const { rows } = await client.query(
     "select count(*)::int as n, count(distinct pattern)::int as patterns, count(distinct category)::int as categories from exercises"
   );
-  console.log(`PASS  0002 through 0009 applied — ${rows[0].n} exercises, ${rows[0].patterns} patterns, ${rows[0].categories} categories`);
+  console.log(`PASS  0002 through 0011 applied — ${rows[0].n} exercises, ${rows[0].patterns} patterns, ${rows[0].categories} categories`);
 
   const uncategorized = await client.query("select name from exercises where category is null");
   console.log(uncategorized.rows.length === 0
     ? "PASS  every exercise has a category"
     : `FAIL  uncategorized: ${uncategorized.rows.map((r: { name: string }) => r.name).join(", ")}`);
 
-  // Safety net: trim anything after the last closing brace
+  // Verify GIN indexes usable + tags well-formed (no empty strings from '{}')
   const bad = await client.query(
     "select name from exercises where '' = any(contraindication_tags) or '' = any(equipment_types)"
   );

@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { LIMITATION_LABELS, filterForLimitations, filterForEquipment, type LimitationTag } from "@/lib/safety/rules";
 import DeliverButtons from "@/components/DeliverButtons";
 import DeletePlanButton from "@/components/DeletePlanButton";
+import SaveTemplateButton from "@/components/SaveTemplateButton";
 import QaReportEditor from "@/components/QaReportEditor";
 import PlanEditor from "@/components/PlanEditor";
 import type { PlanJson, QaReport } from "@/lib/types";
@@ -56,6 +57,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
             clientName={client.full_name}
             clientEmail={client.email}
           />
+          {!planRow.is_single_workout && <SaveTemplateButton planId={planRow.id} />}
           <DeletePlanButton planId={planRow.id} clientId={client.id} planTitle={planRow.title} />
         </div>
       </div>

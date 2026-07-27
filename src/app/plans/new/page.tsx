@@ -6,6 +6,7 @@ export default async function NewPlan({ searchParams }: { searchParams: Promise<
   const { client } = await searchParams;
   const supabase = await supabaseServer();
   const { data: clients } = await supabase.from("clients").select("id, full_name").order("full_name");
+  const { data: templates } = await supabase.from("plan_templates").select("id, name").order("name");
   const workoutTypes = Object.entries(WORKOUT_TYPES).map(([key, v]) => ({ key, label: v.label }));
 
   return (
@@ -14,7 +15,7 @@ export default async function NewPlan({ searchParams }: { searchParams: Promise<
       {(clients ?? []).length === 0 ? (
         <p className="text-sm text-steel">Add a client first.</p>
       ) : (
-        <GenerateForm clients={clients ?? []} workoutTypes={workoutTypes} defaultClient={client} />
+        <GenerateForm clients={clients ?? []} workoutTypes={workoutTypes} defaultClient={client} templates={templates ?? []} />
       )}
     </div>
   );

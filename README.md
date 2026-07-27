@@ -87,6 +87,21 @@ The LLM is never the last line of defense:
   generations — the builder prompt includes a client's real recent
   performance so load suggestions are grounded in what actually happened
   last time, not a generic placeholder.
+- **Training history**: per-client view grouping logged sets by exercise,
+  with a best-effort trend indicator when weight is expressed numerically.
+- **Trainer notes**: an ongoing per-client journal (nutrition, sleep,
+  how they're feeling) separate from the one-time training-history field.
+  Recent notes also feed into the generation prompt as context.
+- **Plan templates**: save any multi-week plan's structure for reuse.
+  Applying a template to a client — even a different one than it was
+  built for — re-runs the full safety filter and QA validator against
+  that client's real limitations and equipment; nothing unsafe carries
+  over silently. No AI call, so it's instant and free.
+- **"Needs a new plan" dashboard callout**: surfaces any client who
+  hasn't had a new plan in 4+ weeks, computed from existing data, no new
+  schema required.
+- **Data export**: one-click JSON backup of everything a trainer owns —
+  clients, plans, logs, notes, templates, custom exercises.
 - **Dashboard**: QA-pass-rate ring, active client count, plans-built-this-
   week, recent plans list, ambient background artwork.
 
@@ -98,7 +113,8 @@ The LLM is never the last line of defense:
    `0005_isolation_and_cardio_machines.sql` →
    `0006_add_single_workout_flag.sql` →
    `0007_functional_and_conditioning_batch.sql` →
-   `0008_ace_style_expansion.sql` → `0009_exercise_logs.sql`.
+   `0008_ace_style_expansion.sql` → `0009_exercise_logs.sql` →
+   `0010_client_notes.sql` → `0011_plan_templates.sql`.
 2. In Supabase → Authentication → Sign In / Providers → Email:
    - Leave **Confirm email** off (account creation completes without a
      click-to-confirm step).
