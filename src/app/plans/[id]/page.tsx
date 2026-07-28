@@ -37,6 +37,25 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
     .eq("plan_id", planRow.id)
     .order("created_at", { ascending: false });
 
+  // Weekly volume per muscle group — total sets across every session,
+  // attributed to each muscle the exercise targets. Uses the full
+  // exercise pool (not the safety-filtered one) so this display never
+  // breaks even if a client's limitations changed after the plan was
+  // built.
+  const exerciseById = new Map((exercisePool ?? []).map((e) => [e.id, e]));
+  const volumeByMuscle = new Map<string, number>();
+  for (const session of plan.sessions) {
+    for (const block of session.blocks) {
+      const ex = exerciseById.get(block.exercise_id);
+      if (!ex) continue;
+      for (const muscle of ex.muscle_groups) {
+        volumeByMuscle.set(muscle, (volumeByMuscle.get(muscle) ?? 0) + block.sets);
+      }
+    }
+  }
+  const volumeSorted = [...volumeByMuscle.entries()].sort((a, b) => b[1] - a[1]);
+  const maxSets = volumeSorted[0]?.[1] ?? 1;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -80,6 +99,24 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
       )}
 
       <PlanEditor planId={planRow.id} clientId={client.id} initialPlan={plan} pool={usable} isSingleWorkout={planRow.is_single_workout} />
+
+      {volumeSorted.length > 0 && (
+        <div className="card">
+          <h2 className="display text-lg mb-3">Weekly volume by muscle group</h2>
+          <p className="text-xs text-steel mb-3">Total sets per muscle across every session in this {planRow.is_single_workout ? "workout" : "week"}.</p>
+          <div className="space-y-1.5">
+            {volumeSorted.map(([muscle, sets]) => (
+              <div key={muscle} className="flex items-center gap-2">
+                <span className="text-xs text-steel w-24 shrink-0 capitalize">{muscle.replace(/_/g, " ")}</span>
+                <div className="flex-1 bg-steel/10 rounded-full h-3 overflow-hidden">
+                  <div className="bg-coral h-full rounded-full" style={{ width: `${(sets / maxSets) * 100}%` }} />
+                </div>
+                <span className="text-xs text-steel w-16 text-right shrink-0">{sets} sets</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {(deliveries ?? []).length > 0 && (
         <div className="card">

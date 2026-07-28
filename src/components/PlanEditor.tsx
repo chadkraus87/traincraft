@@ -149,6 +149,21 @@ export default function PlanEditor({ planId, clientId, initialPlan, pool, isSing
                         {b.name}
                         {b.coaching_note && <p className="text-xs text-steel">{b.coaching_note}</p>}
                         <ExerciseLogRow clientId={clientId} exerciseId={b.exercise_id} planId={planId} />
+                        {(() => {
+                          const ex = poolById.get(b.exercise_id);
+                          if (!ex) return null;
+                          return (
+                            <details className="mt-1">
+                              <summary className="text-xs text-coral cursor-pointer select-none">Why this exercise?</summary>
+                              <p className="text-xs text-steel mt-1">
+                                {ex.pattern.replace(/_/g, " ")} · targets {ex.muscle_groups.join(", ")}
+                                {ex.contraindication_tags.length > 0 && (
+                                  <> — carries safety tags ({ex.contraindication_tags.join(", ")}), already checked against this client&apos;s active limitations</>
+                                )}
+                              </p>
+                            </details>
+                          );
+                        })()}
                       </>
                     ) : (
                       <div className="space-y-1">

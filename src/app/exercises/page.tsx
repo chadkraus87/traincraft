@@ -1,6 +1,7 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import { EXERCISE_CATEGORIES } from "@/lib/safety/rules";
 import { addCustomExercise } from "./actions";
+import MuscleDiagram from "@/components/MuscleDiagram";
 import type { Exercise } from "@/lib/types";
 
 const PATTERNS = [
@@ -13,7 +14,7 @@ function ExerciseRow({ e }: { e: Exercise }) {
   return (
     <li className="card">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="flex-1">
           <p className="font-medium">
             {e.name}{" "}
             {e.trainer_id && <span className="text-xs px-1.5 py-0.5 rounded bg-terracotta/20 text-coral align-middle">Custom</span>}
@@ -24,11 +25,14 @@ function ExerciseRow({ e }: { e: Exercise }) {
           </p>
           {e.cues && <p className="text-xs mt-1 whitespace-pre-wrap text-ink/80">{e.cues}</p>}
         </div>
-        {e.contraindication_tags.length > 0 && (
-          <span className="text-[10px] uppercase tracking-wide text-alarm shrink-0" title={e.contraindication_tags.join(", ")}>
-            ⚑ {e.contraindication_tags.length} safety tag{e.contraindication_tags.length > 1 ? "s" : ""}
-          </span>
-        )}
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          {e.contraindication_tags.length > 0 && (
+            <span className="text-[10px] uppercase tracking-wide text-alarm" title={e.contraindication_tags.join(", ")}>
+              ⚑ {e.contraindication_tags.length} safety tag{e.contraindication_tags.length > 1 ? "s" : ""}
+            </span>
+          )}
+          <MuscleDiagram muscleGroups={e.muscle_groups} />
+        </div>
       </div>
     </li>
   );

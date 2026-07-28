@@ -5,6 +5,7 @@ import { LIMITATION_TAGS, LIMITATION_LABELS, EQUIPMENT_TYPES, equipmentLabel } f
 import { addLimitation, toggleLimitation, addEquipment, removeEquipment, addClientNote } from "../actions";
 import ClientEditPanel from "@/components/ClientEditPanel";
 import NoteRow from "@/components/NoteRow";
+import NotesAndLogsSearch from "@/components/NotesAndLogsSearch";
 
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -44,6 +45,18 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
       : null;
     return { name, entries, trend };
   });
+
+  // Flattened, search-friendly versions of the same data for the combined
+  // notes/logs search box.
+  const searchableNotes = (notes ?? []).map((n) => ({
+    date: new Date(n.created_at).toLocaleDateString(),
+    text: n.note,
+  }));
+  const searchableLogs = ((logs ?? []) as unknown as LogRow[]).map((l) => ({
+    exerciseName: l.exercises?.name ?? "Unknown exercise",
+    date: new Date(l.performed_at).toLocaleDateString(),
+    detail: [l.weight_used, l.reps_completed, l.rpe ? `RPE ${l.rpe}` : null].filter(Boolean).join(", ") || "logged",
+  }));
 
   return (
     <div className="space-y-6">
@@ -136,6 +149,8 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
           </form>
         </div>
       </div>
+
+      <NotesAndLogsSearch notes={searchableNotes} logs={searchableLogs} />
 
       <div className="card">
         <h2 className="display text-lg mb-3">Plan history</h2>
