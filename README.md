@@ -102,6 +102,31 @@ The LLM is never the last line of defense:
   schema required.
 - **Data export**: one-click JSON backup of everything a trainer owns —
   clients, plans, logs, notes, templates, custom exercises.
+- **Retroactive safety re-check**: logging a new limitation now recomputes,
+  on every client page load, whether any existing plan contains an
+  exercise that now conflicts with it — reusing the same filter logic
+  generation uses, just run backward. Purely informational; never
+  silently rewrites a stored plan.
+- **Structured client goals** with target dates, surfaced on the
+  dashboard when a target date is approaching or overdue.
+- **Branded PDF export**: the trainer's own logo and credentials appear
+  in a header band on every exported plan.
+- **Exercise favorites**: star any exercise (base library or custom),
+  filterable in the library.
+- **Stale-limitation reminder**: dashboard flags any limitation active
+  90+ days, prompting a check on whether it's still relevant.
+- **Guided client onboarding**: `/clients/new` walks through basics →
+  limitations → equipment → build first plan, each step saved to the
+  database immediately (nothing lost if abandoned partway). The original
+  one-shot quick-add form on `/clients` still exists alongside it.
+- **Body measurement chart**: "Send measurement chart" button on every
+  client page generates a branded, printable chart (client fills it out
+  by hand and sends it back) — same client-side share/mailto delivery as
+  plan PDFs, no server email credential. Deliberately stays clickable
+  after every send.
+- **Plan comparison**: select any two plans for a client to see them
+  side by side — which exercises are only in one, only the other, or in
+  both, plus the full session breakdown of each.
 - **Dashboard**: QA-pass-rate ring, active client count, plans-built-this-
   week, recent plans list, ambient background artwork.
 
@@ -114,7 +139,8 @@ The LLM is never the last line of defense:
    `0006_add_single_workout_flag.sql` →
    `0007_functional_and_conditioning_batch.sql` →
    `0008_ace_style_expansion.sql` → `0009_exercise_logs.sql` →
-   `0010_client_notes.sql` → `0011_plan_templates.sql`.
+   `0010_client_notes.sql` → `0011_plan_templates.sql` →
+   `0012_client_goals.sql` → `0013_exercise_favorites.sql`.
 2. In Supabase → Authentication → Sign In / Providers → Email:
    - Leave **Confirm email** off (account creation completes without a
      click-to-confirm step).

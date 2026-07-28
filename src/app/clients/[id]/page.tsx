@@ -1,26 +1,64 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { LIMITATION_TAGS, LIMITATION_LABELS, EQUIPMENT_TYPES, equipmentLabel } from "@/lib/safety/rules";
-import { addLimitation, toggleLimitation, addEquipment, removeEquipment, addClientNote } from "../actions";
+import { LIMITATION_TAGS, LIMITATION_LABELS, EQUIPMENT_TYPES, equipmentLabel, filterForLimitations, type LimitationTag } from "@/lib/safety/rules";
+import { addLimitation, toggleLimitation, addEquipment, removeEquipment, addClientNote, addGoal, toggleGoalComplete, deleteGoal } from "../actions";
 import ClientEditPanel from "@/components/ClientEditPanel";
 import NoteRow from "@/components/NoteRow";
 import NotesAndLogsSearch from "@/components/NotesAndLogsSearch";
+import SendMeasurementChartButton from "@/components/SendMeasurementChartButton";
+import PlanCompareSelector from "@/components/PlanCompareSelector";
+import type { PlanJson } from "@/lib/types";
 
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await supabaseServer();
-  const [{ data: client }, { data: limitations }, { data: equipment }, { data: plans }, { data: logs }, { data: notes }] =
+  const [{ data: client }, { data: limitations }, { data: equipment }, { data: plans }, { data: logs }, { data: notes }, { data: allExercises }, { data: goals }] =
     await Promise.all([
       supabase.from("clients").select("*").eq("id", id).single(),
       supabase.from("client_limitations").select("*").eq("client_id", id).order("created_at"),
       supabase.from("client_equipment").select("*").eq("client_id", id).order("created_at"),
-      supabase.from("workout_plans").select("id,title,status,created_at").eq("client_id", id).order("created_at", { ascending: false }),
+      supabase.from("workout_plans").select("id,title,status,created_at,plan").eq("client_id", id).order("created_at", { ascending: false }),
       supabase.from("exercise_logs").select("id, performed_at, weight_used, reps_completed, rpe, exercises(name)")
         .eq("client_id", id).order("performed_at", { ascending: false }).limit(100),
       supabase.from("client_notes").select("*").eq("client_id", id).order("created_at", { ascending: false }),
+      supabase.from("exercises").select("id, name, pattern, contraindication_tags, equipment_types"),
+      supabase.from("client_goals").select("*").eq("client_id", id).order("completed").order("target_date"),
     ]);
   if (!client) notFound();
+
+  // Retroactive safety re-check: a limitation logged AFTER a plan already
+  // exists never automatically re-checks that plan. This recomputes, on
+  // every page load, whether any EXISTING plan now contains an exercise
+  // that conflicts with a currently-active limitation — reusing the exact
+  // same filterForLimitations logic generation uses, just run backward
+  // against already-saved plans instead of a fresh pool. Purely
+  // informational: nothing here silently rewrites a stored plan.
+  const activeLimitationTags = (limitations ?? [])
+    .filter((l) => l.active)
+    .map((l) => l.tag as LimitationTag);
+  const exerciseLookup = new Map((allExercises ?? []).map((e) => [e.id, e]));
+
+  const flaggedPlans = activeLimitationTags.length === 0
+    ? []
+    : (plans ?? [])
+        .map((p) => {
+          const planJson = p.plan as PlanJson;
+          const seenIds = new Set<string>();
+          const planExercises = planJson.sessions
+            .flatMap((s) => s.blocks)
+            .map((b) => b.exercise_id)
+            .filter((exId) => {
+              if (seenIds.has(exId)) return false;
+              seenIds.add(exId);
+              return true;
+            })
+            .map((exId) => exerciseLookup.get(exId))
+            .filter((e): e is { id: string; name: string; pattern: string; contraindication_tags: string[]; equipment_types: string[] } => !!e);
+          const { excluded } = filterForLimitations(planExercises, activeLimitationTags);
+          return { plan: p, conflicts: excluded };
+        })
+        .filter((entry) => entry.conflicts.length > 0);
 
   // Group logs by exercise name for the training-history view. Best-effort
   // numeric extraction from weight_used (free text — "25 lb", "bodyweight",
@@ -60,7 +98,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="display text-3xl">{client.full_name}</h1>
           <p className="text-sm text-steel mt-1">
@@ -68,15 +106,79 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
             {client.is_remote && " · Remote"}
           </p>
         </div>
-        <Link href={`/plans/new?client=${client.id}`} className="btn">Build a plan</Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          <SendMeasurementChartButton clientId={client.id} clientName={client.full_name} clientEmail={client.email} />
+          <Link href={`/plans/new?client=${client.id}`} className="btn">Build a plan</Link>
+        </div>
       </div>
 
       <ClientEditPanel client={client} />
+
+      {flaggedPlans.length > 0 && (
+        <div className="border-l-4 border-alarm bg-alarm/10 px-4 py-3 rounded-r-md text-sm">
+          <p className="font-medium text-alarm mb-1">
+            {flaggedPlans.length} plan{flaggedPlans.length > 1 ? "s" : ""} may need review given this client&apos;s current limitations
+          </p>
+          <ul className="space-y-1">
+            {flaggedPlans.map(({ plan, conflicts }) => (
+              <li key={plan.id}>
+                <Link href={`/plans/${plan.id}`} className="text-alarm underline">{plan.title}</Link>
+                <span className="text-steel">
+                  {" "}— {conflicts.map((c) => c.exercise_name).join(", ")} may conflict with {[...new Set(conflicts.map((c) => LIMITATION_LABELS[c.limitation_tag as keyof typeof LIMITATION_LABELS] ?? c.limitation_tag))].join(", ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {client.training_history && (
         <div className="card"><span className="label">Training history</span>
           <p className="text-sm whitespace-pre-wrap">{client.training_history}</p></div>
       )}
+
+      <div className="card">
+        <h2 className="display text-lg mb-3">Goals</h2>
+        <form action={addGoal} className="flex flex-wrap gap-2 mb-3">
+          <input type="hidden" name="client_id" value={client.id} />
+          <input name="description" className="input flex-1 min-w-40" placeholder="e.g. First unassisted pull-up" />
+          <input name="target_date" type="date" className="input w-auto" />
+          <button className="btn-ghost shrink-0">Add goal</button>
+        </form>
+        {(goals ?? []).length === 0 && <p className="text-sm text-steel">No goals logged yet.</p>}
+        <ul className="space-y-1.5">
+          {(goals ?? []).map((g) => {
+            const daysLeft = g.target_date
+              ? Math.ceil((new Date(g.target_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+              : null;
+            return (
+              <li key={g.id} className={`flex items-center justify-between gap-2 text-sm ${g.completed ? "opacity-50" : ""}`}>
+                <span className={g.completed ? "line-through" : ""}>
+                  {g.description}
+                  {g.target_date && (
+                    <span className="text-steel">
+                      {" "}— {daysLeft !== null && daysLeft < 0 ? "past target date" : daysLeft === 0 ? "target date is today" : `${daysLeft} days left`} ({new Date(g.target_date).toLocaleDateString()})
+                    </span>
+                  )}
+                </span>
+                <div className="flex gap-2 shrink-0">
+                  <form action={toggleGoalComplete}>
+                    <input type="hidden" name="id" value={g.id} />
+                    <input type="hidden" name="client_id" value={client.id} />
+                    <input type="hidden" name="completed" value={String(!g.completed)} />
+                    <button className="text-xs text-coral underline">{g.completed ? "Reopen" : "Complete"}</button>
+                  </form>
+                  <form action={deleteGoal}>
+                    <input type="hidden" name="id" value={g.id} />
+                    <input type="hidden" name="client_id" value={client.id} />
+                    <button className="text-xs text-alarm underline">Delete</button>
+                  </form>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Limitations */}
@@ -155,16 +257,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
       <div className="card">
         <h2 className="display text-lg mb-3">Plan history</h2>
         {(plans ?? []).length === 0 && <p className="text-sm text-steel">No plans yet.</p>}
-        <ul className="divide-y divide-steel/10">
-          {(plans ?? []).map((p) => (
-            <li key={p.id} className="py-2 flex items-center justify-between">
-              <Link href={`/plans/${p.id}`} className="text-sm hover:text-coral">{p.title}</Link>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "final" ? "bg-success/10 text-success" : "bg-signal/20 text-[#F4C77A]"}`}>
-                {p.status === "final" ? "QA passed" : "Draft"}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <PlanCompareSelector plans={(plans ?? []).map((p) => ({ id: p.id, title: p.title, status: p.status }))} clientId={client.id} />
       </div>
       <div className="card">
         <h2 className="display text-lg mb-3">Training history</h2>

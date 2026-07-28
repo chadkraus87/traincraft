@@ -48,6 +48,8 @@ async function main() {
   const m9 = readFileSync("supabase/migrations/0009_exercise_logs.sql", "utf8");
   const m10 = readFileSync("supabase/migrations/0010_client_notes.sql", "utf8");
   const m11 = readFileSync("supabase/migrations/0011_plan_templates.sql", "utf8");
+  const m12 = readFileSync("supabase/migrations/0012_client_goals.sql", "utf8");
+  const m13 = readFileSync("supabase/migrations/0013_exercise_favorites.sql", "utf8");
   await client.query(m1);
   console.log("PASS  0001_schema.sql applied");
   await client.query(m2);
@@ -60,10 +62,12 @@ async function main() {
   await client.query(m9);
   await client.query(m10);
   await client.query(m11);
+  await client.query(m12);
+  await client.query(m13);
   const { rows } = await client.query(
     "select count(*)::int as n, count(distinct pattern)::int as patterns, count(distinct category)::int as categories from exercises"
   );
-  console.log(`PASS  0002 through 0011 applied — ${rows[0].n} exercises, ${rows[0].patterns} patterns, ${rows[0].categories} categories`);
+  console.log(`PASS  0002 through 0013 applied — ${rows[0].n} exercises, ${rows[0].patterns} patterns, ${rows[0].categories} categories`);
 
   const uncategorized = await client.query("select name from exercises where category is null");
   console.log(uncategorized.rows.length === 0

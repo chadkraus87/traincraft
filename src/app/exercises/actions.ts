@@ -2,6 +2,18 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
 
+export async function toggleFavorite(exerciseId: string, currentlyFavorited: boolean) {
+  const supabase = await supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+  if (currentlyFavorited) {
+    await supabase.from("exercise_favorites").delete().eq("trainer_id", user.id).eq("exercise_id", exerciseId);
+  } else {
+    await supabase.from("exercise_favorites").insert({ trainer_id: user.id, exercise_id: exerciseId });
+  }
+  revalidatePath("/exercises");
+}
+
 export async function addCustomExercise(form: FormData) {
   const supabase = await supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();

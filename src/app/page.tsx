@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
+import { LIMITATION_LABELS } from "@/lib/safety/rules";
 
 const RING_RADIUS = 30;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -24,6 +25,8 @@ export default async function Dashboard({
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const staleThreshold = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
+  const goalHorizon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const limitationStaleThreshold = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
     { count: clients },
@@ -33,6 +36,8 @@ export default async function Dashboard({
     { data: recent },
     { data: allClients },
     { data: allPlanDates },
+    { data: upcomingGoals },
+    { data: staleLimitations },
   ] = await Promise.all([
     supabase.from("clients").select("*", { count: "exact", head: true }),
     supabase.from("workout_plans").select("*", { count: "exact", head: true }),
@@ -42,6 +47,11 @@ export default async function Dashboard({
       .order("created_at", { ascending: false }).limit(5),
     supabase.from("clients").select("id, full_name"),
     supabase.from("workout_plans").select("client_id, created_at").order("created_at", { ascending: false }),
+    supabase.from("client_goals").select("id, description, target_date, client_id, clients(full_name)")
+      .eq("completed", false).not("target_date", "is", null).lte("target_date", goalHorizon)
+      .order("target_date"),
+    supabase.from("client_limitations").select("id, tag, detail, client_id, created_at, clients(full_name)")
+      .eq("active", true).lt("created_at", limitationStaleThreshold),
   ]);
 
   // "Needs a new plan" — clients with no plan in 4+ weeks, or none at all.
@@ -81,6 +91,42 @@ export default async function Dashboard({
           </ul>
         </div>
       )}
+
+      {(upcomingGoals ?? []).length > 0 && (
+        <div className="border-l-4 border-coral bg-coral/10 px-4 py-3 rounded-r-md text-sm">
+          <p className="font-medium text-coral mb-1">Goals coming up</p>
+          <ul className="space-y-0.5">
+            {(upcomingGoals ?? []).map((g) => {
+              const overdue = g.target_date && new Date(g.target_date) < new Date();
+              return (
+                <li key={g.id}>
+                  <Link href={`/clients/${g.client_id}`} className="text-coral underline">
+                    {(g.clients as unknown as { full_name: string })?.full_name}
+                  </Link>
+                  <span className="text-steel"> — {g.description} ({overdue ? "past due" : new Date(g.target_date!).toLocaleDateString()})</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {(staleLimitations ?? []).length > 0 && (
+        <div className="border-l-4 border-steel/40 bg-steel/5 px-4 py-3 rounded-r-md text-sm">
+          <p className="font-medium mb-1">Limitations active 90+ days — still relevant?</p>
+          <ul className="space-y-0.5">
+            {(staleLimitations ?? []).map((l) => (
+              <li key={l.id}>
+                <Link href={`/clients/${l.client_id}`} className="text-coral underline">
+                  {(l.clients as unknown as { full_name: string })?.full_name}
+                </Link>
+                <span className="text-steel"> — {LIMITATION_LABELS[l.tag as keyof typeof LIMITATION_LABELS] ?? l.tag}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div>
         <h1 className="display text-4xl">Your gym floor</h1>
         <p className="text-steel text-base mt-1">{clients ?? 0} clients · {plans ?? 0} plans built</p>

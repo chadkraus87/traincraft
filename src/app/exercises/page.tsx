@@ -2,6 +2,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { EXERCISE_CATEGORIES } from "@/lib/safety/rules";
 import { addCustomExercise } from "./actions";
 import MuscleDiagram from "@/components/MuscleDiagram";
+import FavoriteStar from "@/components/FavoriteStar";
 import type { Exercise } from "@/lib/types";
 
 const PATTERNS = [
@@ -10,12 +11,13 @@ const PATTERNS = [
   "carry","conditioning","mobility",
 ];
 
-function ExerciseRow({ e }: { e: Exercise }) {
+function ExerciseRow({ e, favorited }: { e: Exercise; favorited: boolean }) {
   return (
     <li className="card">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <p className="font-medium">
+          <p className="font-medium flex items-center gap-1.5">
+            <FavoriteStar exerciseId={e.id} initialFavorited={favorited} />
             {e.name}{" "}
             {e.trainer_id && <span className="text-xs px-1.5 py-0.5 rounded bg-terracotta/20 text-coral align-middle">Custom</span>}
           </p>
@@ -41,16 +43,26 @@ function ExerciseRow({ e }: { e: Exercise }) {
 export default async function ExercisesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; pattern?: string; category?: string }>;
+  searchParams: Promise<{ q?: string; pattern?: string; category?: string; favorites?: string }>;
 }) {
-  const { q, pattern, category } = await searchParams;
+  const { q, pattern, category, favorites } = await searchParams;
   const supabase = await supabaseServer();
-  let query = supabase.from("exercises").select("*").eq("is_active", true).order("name");
-  if (q) query = query.ilike("name", `%${q}%`);
-  if (pattern) query = query.eq("pattern", pattern);
-  if (category) query = query.eq("category", category);
-  const { data } = await query;
-  const exercises = (data ?? []) as Exercise[];
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const [queryResult, favoritesResult] = await Promise.all([
+    (() => {
+      let query = supabase.from("exercises").select("*").eq("is_active", true).order("name");
+      if (q) query = query.ilike("name", `%${q}%`);
+      if (pattern) query = query.eq("pattern", pattern);
+      if (category) query = query.eq("category", category);
+      return query;
+    })(),
+    user ? supabase.from("exercise_favorites").select("exercise_id").eq("trainer_id", user.id) : Promise.resolve({ data: [] }),
+  ]);
+
+  const favoritedIds = new Set((favoritesResult.data ?? []).map((f: { exercise_id: string }) => f.exercise_id));
+  let exercises = (queryResult.data ?? []) as Exercise[];
+  if (favorites === "1") exercises = exercises.filter((e) => favoritedIds.has(e.id));
 
   const byCategory = EXERCISE_CATEGORIES.map((cat) => ({
     category: cat,
@@ -63,7 +75,7 @@ export default async function ExercisesPage({
     <div className="grid md:grid-cols-[1fr_340px] gap-6">
       <div>
         <h1 className="display text-3xl mb-4">Exercise library</h1>
-        <form className="flex gap-2 mb-4 flex-wrap">
+        <form className="flex gap-2 mb-4 flex-wrap items-center">
           <input name="q" defaultValue={q} className="input" placeholder="Search exercises…" />
           <select name="category" defaultValue={category ?? ""} className="input max-w-56">
             <option value="">All categories</option>
@@ -73,6 +85,10 @@ export default async function ExercisesPage({
             <option value="">All patterns</option>
             {PATTERNS.map((p) => <option key={p} value={p}>{p.replace("_", " ")}</option>)}
           </select>
+          <label className="flex items-center gap-1.5 text-sm shrink-0">
+            <input type="checkbox" name="favorites" value="1" defaultChecked={favorites === "1"} />
+            Favorites only
+          </label>
           <button className="btn">Filter</button>
         </form>
 
@@ -86,7 +102,7 @@ export default async function ExercisesPage({
                 <span className="text-steel text-sm normal-case font-body font-normal">({g.items.length})</span>
               </summary>
               <ul className="space-y-2 mb-2">
-                {g.items.map((e) => <ExerciseRow key={e.id} e={e} />)}
+                {g.items.map((e) => <ExerciseRow key={e.id} e={e} favorited={favoritedIds.has(e.id)} />)}
               </ul>
             </details>
           ))}
@@ -97,7 +113,7 @@ export default async function ExercisesPage({
                 <span className="text-steel text-sm normal-case font-body font-normal">({uncategorized.length})</span>
               </summary>
               <ul className="space-y-2 mb-2">
-                {uncategorized.map((e) => <ExerciseRow key={e.id} e={e} />)}
+                {uncategorized.map((e) => <ExerciseRow key={e.id} e={e} favorited={favoritedIds.has(e.id)} />)}
               </ul>
             </details>
           )}

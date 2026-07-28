@@ -24,6 +24,21 @@ export async function addClient(form: FormData) {
   revalidatePath("/clients");
 }
 
+export async function createClientForOnboarding(form: FormData) {
+  const { supabase, userId } = await uid();
+  const { data, error } = await supabase.from("clients").insert({
+    trainer_id: userId,
+    full_name: String(form.get("full_name")),
+    email: String(form.get("email") || "") || null,
+    phone: String(form.get("phone") || "") || null,
+    goals: String(form.get("goals") || "") || null,
+    training_history: String(form.get("training_history") || "") || null,
+    is_remote: form.get("is_remote") === "on",
+  }).select("id").single();
+  if (error || !data) throw new Error(error?.message ?? "Could not create client");
+  redirect(`/clients/new/${data.id}/limitations`);
+}
+
 export async function updateClient(form: FormData) {
   const { supabase } = await uid();
   const clientId = String(form.get("id"));
@@ -60,6 +75,7 @@ export async function addLimitation(form: FormData) {
     detail: String(form.get("detail") || "") || null,
   });
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath(`/clients/new/${clientId}/limitations`);
 }
 
 export async function toggleLimitation(form: FormData) {
@@ -84,12 +100,44 @@ export async function addEquipment(form: FormData) {
     weight_lb: weight ? Number(weight) : null,
   });
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath(`/clients/new/${clientId}/equipment`);
 }
 
 export async function removeEquipment(form: FormData) {
   const { supabase } = await uid();
   const clientId = String(form.get("client_id"));
   await supabase.from("client_equipment").delete().eq("id", String(form.get("id")));
+  revalidatePath(`/clients/${clientId}`);
+}
+
+export async function addGoal(form: FormData) {
+  const { supabase, userId } = await uid();
+  const clientId = String(form.get("client_id"));
+  const description = String(form.get("description") || "").trim();
+  if (!description) return;
+  const targetDate = String(form.get("target_date") || "");
+  await supabase.from("client_goals").insert({
+    trainer_id: userId,
+    client_id: clientId,
+    description,
+    target_date: targetDate || null,
+  });
+  revalidatePath(`/clients/${clientId}`);
+}
+
+export async function toggleGoalComplete(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  await supabase.from("client_goals")
+    .update({ completed: form.get("completed") === "true" })
+    .eq("id", String(form.get("id")));
+  revalidatePath(`/clients/${clientId}`);
+}
+
+export async function deleteGoal(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  await supabase.from("client_goals").delete().eq("id", String(form.get("id")));
   revalidatePath(`/clients/${clientId}`);
 }
 

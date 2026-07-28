@@ -29,6 +29,9 @@ export default async function ClientsPage() {
       </div>
       <aside className="card h-fit">
         <h2 className="display text-lg mb-3">Add client</h2>
+        <p className="text-xs text-steel mb-3">
+          New client? Try the <a href="/clients/new" className="text-coral underline">guided setup</a> instead — walks through limitations and equipment step by step.
+        </p>
         <form action={addClient} className="space-y-3">
           <div><span className="label">Full name</span><input name="full_name" required className="input" /></div>
           <div><span className="label">Email</span><input name="email" type="email" className="input" /></div>
