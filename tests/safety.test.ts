@@ -23,7 +23,13 @@ function check(name: string, cond: boolean, detail = "") {
 const ruleTags = new Set(
   Object.values(CONTRAINDICATIONS).flatMap((r) => r.avoidExerciseTags)
 );
-const seedSql = readFileSync("supabase/migrations/0002_seed_exercises.sql", "utf8");
+const seedSql =
+  readFileSync("supabase/migrations/0002_seed_exercises.sql", "utf8") +
+  readFileSync("supabase/migrations/0003_expand_exercise_library.sql", "utf8") +
+  readFileSync("supabase/migrations/0005_isolation_and_cardio_machines.sql", "utf8") +
+  readFileSync("supabase/migrations/0007_functional_and_conditioning_batch.sql", "utf8") +
+  readFileSync("supabase/migrations/0008_ace_style_expansion.sql", "utf8") +
+  readFileSync("supabase/migrations/0014_nasm_pes_batch.sql", "utf8");
 const seedTagMatches = [...seedSql.matchAll(/'\{([a-z_,]*)\}',\s*(?:true|false)\)/g)];
 const seedTags = new Set(
   seedTagMatches.flatMap((m) => (m[1] ? m[1].split(",") : []))
@@ -42,7 +48,20 @@ check(
 );
 if (unusedRuleTags.length) console.log(`  note: rule-only tags: ${unusedRuleTags.join(", ")}`);
 
-// ── Filter edge cases ───────────────────────────────────────────────────
+// ── Category coverage ────────────────────────────────────────────────
+import { EXERCISE_CATEGORIES } from "../src/lib/safety/rules";
+const categoryMigration = readFileSync("supabase/migrations/0004_add_exercise_category.sql", "utf8");
+const usedCategories = [...categoryMigration.matchAll(/category = '([^']+)'/g)].map((m) => m[1]);
+const invalidCategories = usedCategories.filter(
+  (c) => !(EXERCISE_CATEGORIES as readonly string[]).includes(c)
+);
+check(
+  "every category assigned in the migration is a recognized category",
+  invalidCategories.length === 0,
+  `unrecognized: ${invalidCategories.join(", ")}`
+);
+
+
 const mk = (over: Partial<Exercise>): Exercise => ({
   id: crypto.randomUUID(),
   trainer_id: null,
@@ -90,8 +109,7 @@ const squat = mk({ name: "Goblet Squat", equipment_types: ["kettlebell"] });
 
 // ── QA validator: a compliant plan passes ───────────────────────────────
 const pool: Exercise[] = [
-  mk({ name: "Goblet Squat", pattern: "squat",
-  category: "Foundational strength", equipment_types: ["kettlebell"] }),
+  mk({ name: "Goblet Squat", pattern: "squat", equipment_types: ["kettlebell"] }),
   mk({ name: "KB Deadlift", pattern: "hinge", equipment_types: ["kettlebell"] }),
   mk({ name: "Push-Up", pattern: "push_horizontal" }),
   mk({ name: "Banded Row", pattern: "pull_horizontal", equipment_types: ["band"] }),

@@ -8,14 +8,17 @@ interface Props {
   workoutTypes: { key: string; label: string }[];
   defaultClient?: string;
   templates: { id: string; name: string }[];
+  defaultWorkoutType?: string;
+  defaultWeeks?: number;
+  defaultDays?: number;
 }
 
-export default function GenerateForm({ clients, workoutTypes, defaultClient, templates }: Props) {
+export default function GenerateForm({ clients, workoutTypes, defaultClient, templates, defaultWorkoutType, defaultWeeks, defaultDays }: Props) {
   const router = useRouter();
   const [clientId, setClientId] = useState(defaultClient ?? clients[0]?.id ?? "");
-  const [workoutType, setWorkoutType] = useState(workoutTypes[0]?.key ?? "");
-  const [weeks, setWeeks] = useState("4");
-  const [days, setDays] = useState("3");
+  const [workoutType, setWorkoutType] = useState(defaultWorkoutType ?? workoutTypes[0]?.key ?? "");
+  const [weeks, setWeeks] = useState(String(defaultWeeks ?? 4));
+  const [days, setDays] = useState(String(defaultDays ?? 3));
   const [notes, setNotes] = useState("");
   const [showEquipment, setShowEquipment] = useState(false);
   const [extraEquipment, setExtraEquipment] = useState<string[]>([]);
@@ -90,6 +93,7 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient, tem
       {!templateId && (
         <>
           <div><span className="label">Workout type</span>
+            {defaultWorkoutType && <p className="text-xs text-steel -mt-0.5 mb-1">Defaulted to what this client used last time.</p>}
             <select className="input" value={workoutType} onChange={(e) => setWorkoutType(e.target.value)}>
               {workoutTypes.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
             </select></div>

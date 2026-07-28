@@ -8,7 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { measurementChartToPdf } from "@/lib/pdf";
+import { measurementChartToFillablePdf } from "@/lib/pdf";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,7 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { data: client } = await supabase.from("clients").select("full_name").eq("id", id).single();
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
-  const buffer = await measurementChartToPdf(client.full_name);
+  const buffer = await measurementChartToFillablePdf(client.full_name);
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",

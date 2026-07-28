@@ -48,14 +48,15 @@ The LLM is never the last line of defense:
 - **Clients**: add, edit, delete. Per-client injuries/limitations (14-tag
   controlled vocabulary + free-text detail, can be marked resolved) and
   equipment inventory (25 equipment types across 5 groups).
-- **Exercise library**: 400 exercises across 8 categories — Foundational
+- **Exercise library**: 543 exercises across 8 categories — Foundational
   strength, CrossFit, Functional movement, Hyrox, HIIT, Yoga, Mat Pilates,
   and Senior-specific — plus trainer-added custom exercises, all usable
   identically by the Workout Builder. Library UI groups exercises by
   category in collapsible sections (collapsed by default), filterable by
   category and movement pattern.
 - **Build a Plan**: multi-week program generation (client, workout type,
-  weeks, days/week, trainer notes, equipment toggle).
+  weeks, days/week, trainer notes, equipment toggle). Defaults to
+  whatever workout type/duration a client used last time, when known.
 - **Build a Workout**: single one-off session generation for a client —
   same safety pipeline as Build a Plan, without the weeks/days setup.
   Reuses the same underlying plan infrastructure via an `is_single_workout`
@@ -120,10 +121,13 @@ The LLM is never the last line of defense:
   database immediately (nothing lost if abandoned partway). The original
   one-shot quick-add form on `/clients` still exists alongside it.
 - **Body measurement chart**: "Send measurement chart" button on every
-  client page generates a branded, printable chart (client fills it out
-  by hand and sends it back) — same client-side share/mailto delivery as
-  plan PDFs, no server email credential. Deliberately stays clickable
-  after every send.
+  client page generates a genuinely fillable PDF (using pdf-lib, the one
+  place in the codebase that isn't @react-pdf/renderer — real clickable/
+  typeable AcroForm fields, not a print-and-fill-by-hand static document)
+  — same client-side share/mailto delivery as plan PDFs, no server email
+  credential. Verified programmatically (real field count, real
+  pre-filled values read back out) as well as visually. Deliberately
+  stays clickable after every send.
 - **Plan comparison**: select any two plans for a client to see them
   side by side — which exercises are only in one, only the other, or in
   both, plus the full session breakdown of each.
@@ -140,7 +144,8 @@ The LLM is never the last line of defense:
    `0007_functional_and_conditioning_batch.sql` →
    `0008_ace_style_expansion.sql` → `0009_exercise_logs.sql` →
    `0010_client_notes.sql` → `0011_plan_templates.sql` →
-   `0012_client_goals.sql` → `0013_exercise_favorites.sql`.
+   `0012_client_goals.sql` → `0013_exercise_favorites.sql` →
+   `0014_nasm_pes_batch.sql`.
 2. In Supabase → Authentication → Sign In / Providers → Email:
    - Leave **Confirm email** off (account creation completes without a
      click-to-confirm step).
