@@ -139,11 +139,18 @@ history, add the Twilio env vars, and restore the "Text to client" button
 in `src/components/DeliverButtons.tsx`.
 
 ## Tests
+- `npm run check:migrations` — verifies supabase/migrations/ has no
+  numbering gaps. Self-updating: doesn't hardcode which files should
+  exist, just checks the sequence from 0001 to the highest number present
+  is complete. Catches migrations that were run directly in Supabase's
+  SQL Editor but never committed to git — this has happened twice on this
+  project already. Runs first in CI, before the slower database test, so
+  a gap fails fast and cheap.
 - `npm test` — safety engine + QA validator unit tests, PDF render with
   content verification, builder pool-guard, and an audit that every
   contraindication tag used across all exercise-seed migrations is
   actually enforced by a rule. Runs in CI on every push.
-- `npm run test:db` — applies all nine migrations to an embedded real
+- `npm run test:db` — applies all migrations to an embedded real
   Postgres instance (auth schema stubbed) and verifies seed integrity,
   category coverage, and RLS coverage. Runs in CI on every push.
 - `npm run test:e2e` — real browser end-to-end test (Playwright) covering

@@ -23,6 +23,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Check migration files are complete (no gaps)
+        run: npm run check:migrations
+
       - name: Unit tests (safety engine, QA validator, PDF, builder guard)
         run: npm test
 
