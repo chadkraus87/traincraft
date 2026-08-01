@@ -2,22 +2,6 @@
 import { useState } from "react";
 import { confirmDeliverySent } from "@/app/plans/actions";
 
-/**
- * Plan delivery, redesigned to never send email from a stored server
- * credential. Instead:
- *  - Mobile / share-capable browsers: hands the PDF to the OS share sheet
- *    (Web Share API with a file), so the trainer picks Mail, Gmail, etc.
- *    and it sends from whatever account they're already using on their
- *    own device.
- *  - Desktop fallback (Web Share API for files isn't universally
- *    supported): downloads the PDF and opens the default mail app with
- *    the client's address, subject, and a short message pre-filled.
- *
- * Delivery confirmation is explicitly trainer-attested: after the share
- * sheet or mail app opens, the app has no way to actually know whether the
- * send completed, so it asks the trainer to confirm rather than pretending
- * to auto-detect something it can't see.
- */
 export default function DeliverButtons({
   planId,
   planTitle,
@@ -37,6 +21,20 @@ export default function DeliverButtons({
   const pdfUrl = `/api/plans/${planId}/pdf`;
   const fileName = `${planTitle}.pdf`;
 
+  const downloadAndMailto = (blob: Blob, subject: string, body: string) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    const mailto = `mailto:${clientEmail ?? ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    setStatus("PDF downloaded — attach it in the mail window that just opened.");
+    setAwaitingConfirm(true);
+  };
+
   const emailToClient = async () => {
     setBusy(true);
     setStatus(null);
@@ -55,28 +53,24 @@ export default function DeliverButtons({
       };
       const canShareFile = !!nav.canShare && nav.canShare({ files: [file] });
 
+      let shared = false;
       if (canShareFile && nav.share) {
-        await nav.share({ files: [file], title: subject, text: body });
-        setStatus("Opened your share sheet.");
-      } else {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        try {
+          await nav.share({ files: [file], title: subject, text: body });
+          setStatus("Opened your share sheet.");
+          setAwaitingConfirm(true);
+          shared = true;
+        } catch (shareErr) {
+          if (shareErr instanceof Error && shareErr.name === "AbortError") {
+            setStatus(null);
+            shared = true;
+          }
+        }
+      }
 
-        const mailto = `mailto:${clientEmail ?? ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.location.href = mailto;
-        setStatus("PDF downloaded — attach it in the mail window that just opened.");
-      }
-      setAwaitingConfirm(true);
+      if (!shared) downloadAndMailto(blob, subject, body);
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") {
-        setStatus(null); // trainer closed the share sheet — not an error
-      } else {
-        setStatus(e instanceof Error ? e.message : "Something went wrong.");
-      }
+      setStatus(e instanceof Error ? e.message : "Something went wrong.");
     }
     setBusy(false);
   };

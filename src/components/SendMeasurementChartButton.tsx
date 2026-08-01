@@ -1,13 +1,6 @@
 "use client";
 import { useState } from "react";
 
-/**
- * Sends the blank measurement chart to a client — same share-sheet/mailto
- * pattern as plan delivery (DeliverButtons), no server email credential.
- * Deliberately stays clickable after every send: busy resets to false
- * once the share sheet opens or the download completes, regardless of
- * outcome, so the trainer can send this as many times as they want.
- */
 export default function SendMeasurementChartButton({
   clientId,
   clientName,
@@ -22,6 +15,19 @@ export default function SendMeasurementChartButton({
 
   const pdfUrl = `/api/clients/${clientId}/measurement-chart/pdf`;
   const fileName = `${clientName} - Measurement Chart.pdf`;
+
+  const downloadAndMailto = (blob: Blob, subject: string, body: string) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    const mailto = `mailto:${clientEmail ?? ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    setStatus("PDF downloaded — attach it in the mail window that just opened.");
+  };
 
   const send = async () => {
     setBusy(true);
@@ -41,29 +47,25 @@ export default function SendMeasurementChartButton({
       };
       const canShareFile = !!nav.canShare && nav.canShare({ files: [file] });
 
+      let shared = false;
       if (canShareFile && nav.share) {
-        await nav.share({ files: [file], title: subject, text: body });
-        setStatus("Opened your share sheet.");
-      } else {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        try {
+          await nav.share({ files: [file], title: subject, text: body });
+          setStatus("Opened your share sheet.");
+          shared = true;
+        } catch (shareErr) {
+          if (shareErr instanceof Error && shareErr.name === "AbortError") {
+            setStatus(null);
+            shared = true;
+          }
+        }
+      }
 
-        const mailto = `mailto:${clientEmail ?? ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.location.href = mailto;
-        setStatus("PDF downloaded — attach it in the mail window that just opened.");
-      }
+      if (!shared) downloadAndMailto(blob, subject, body);
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") {
-        setStatus(null); // trainer closed the share sheet — not an error
-      } else {
-        setStatus(e instanceof Error ? e.message : "Something went wrong.");
-      }
+      setStatus(e instanceof Error ? e.message : "Something went wrong.");
     }
-    setBusy(false); // always re-enabled — send this as many times as needed
+    setBusy(false);
   };
 
   return (
