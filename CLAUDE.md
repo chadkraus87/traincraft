@@ -16,8 +16,18 @@ contraindications and QA-checked before the trainer sees it.
   request.
 - `supabase/migrations/` — 14 versioned migrations. **Never edit an applied
   migration; add a new one.** `npm run check:migrations` guards this.
-- Plan generation runs **asynchronously through Inngest** so long Claude API jobs
-  retry cleanly instead of dying to a serverless timeout.
+- **Plan generation (synchronous today):** `POST /api/generate`
+  (`src/app/api/generate/route.ts`) runs the full pipeline in a single HTTP
+  request. The route sets `export const maxDuration = 120` (Vercel serverless
+  budget). Flow: load client, limitations, equipment, and exercise pool →
+  deterministic pre-filter (`src/lib/safety/rules.ts`) → synchronous Claude
+  generation (`src/lib/ai/builder.ts`) → deterministic QA
+  (`src/lib/ai/validate.ts`) → at most one in-request QA retry (a second
+  Claude call with QA failure feedback if the first attempt fails QA) → insert
+  into `workout_plans`. `status` is `final` when QA passes, `draft` when it
+  still fails; the full `qa_report` is stored either way. The trainer UI
+  (`GenerateForm`, `BuildWorkoutForm`) blocks on this response—there is no job
+  queue or generation-status polling in the app today.
 
 ## Non-negotiable rules
 1. **Contraindication filtering is a safety feature, not a nicety.** Exercises
@@ -26,14 +36,18 @@ contraindications and QA-checked before the trainer sees it.
    a test passing — a wrong plan can injure a real person.
 2. **The automated QA pass gates delivery.** Plans clear QA before a trainer sees
    them. Keep that ordering; don't surface unvalidated output.
-3. **Long AI work goes through Inngest, never inline in a request handler.**
-   Claude plan generation exceeds serverless request budgets. If you add a new
-   generation path, make it a job.
+3. **Preserve the generation safety pipeline.** New or refactored generation
+   code must keep the same ordering: pre-filter → Claude programs only from the
+   filtered pool → QA → persist. Do not add a second path that skips filtering
+   or QA to go faster or simplify tests. If production timeouts, concurrent
+   generation, or multi-tenant load make the synchronous route untenable,
+   reconsider durable background jobs (e.g. Inngest)—a plausible future
+   direction, not implemented in this repository.
 4. **RLS in the database, not checks in the client.** Trainer/client data is
    scoped in Postgres policies.
-5. **Never commit keys.** `ANTHROPIC_API_KEY`, Supabase service-role, and Inngest
-   signing keys live in Vercel env vars only. The Supabase anon key is public by
-   design and fine.
+5. **Never commit keys.** `ANTHROPIC_API_KEY` and the Supabase service-role key
+   live in Vercel env vars only. The Supabase anon key is public by design and
+   fine.
 
 ## Commands
 ```
@@ -50,4 +64,6 @@ or migration, and `check:migrations` before pushing schema changes.
 ## Gotchas
 - App Router server/client component boundaries: anything importing the Supabase
   service client must stay server-side.
-- Inngest jobs need the dev server running to be exercised locally.
+- A failed QA path can mean two Claude calls in one request; everything must
+  finish within `maxDuration`. Client forms treat a non-JSON response as a likely
+  timeout—see `GenerateForm` / `BuildWorkoutForm`.
