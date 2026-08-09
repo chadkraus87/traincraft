@@ -113,13 +113,17 @@ const squat = mk({ name: "Goblet Squat", equipment_types: ["kettlebell"] });
 }
 
 // ── QA validator: a compliant plan passes ───────────────────────────────
+// Muscle groups are set per exercise rather than left at the factory
+// default — recovery_spacing reasons about them, and a fixture where every
+// movement trains "quads" would make any multi-day plan look like it hammers
+// the same tissue every session.
 const pool: Exercise[] = [
-  mk({ name: "Goblet Squat", pattern: "squat", equipment_types: ["kettlebell"] }),
-  mk({ name: "KB Deadlift", pattern: "hinge", equipment_types: ["kettlebell"] }),
-  mk({ name: "Push-Up", pattern: "push_horizontal" }),
-  mk({ name: "Banded Row", pattern: "pull_horizontal", equipment_types: ["band"] }),
-  mk({ name: "Dead Bug", pattern: "core_antiextension" }),
-  mk({ name: "Farmer Carry", pattern: "carry", equipment_types: ["kettlebell"] }),
+  mk({ name: "Goblet Squat", pattern: "squat", equipment_types: ["kettlebell"], muscle_groups: ["quads", "glutes"] }),
+  mk({ name: "KB Deadlift", pattern: "hinge", equipment_types: ["kettlebell"], muscle_groups: ["hamstrings", "glutes"] }),
+  mk({ name: "Push-Up", pattern: "push_horizontal", muscle_groups: ["chest", "triceps"] }),
+  mk({ name: "Banded Row", pattern: "pull_horizontal", equipment_types: ["band"], muscle_groups: ["back", "biceps"] }),
+  mk({ name: "Dead Bug", pattern: "core_antiextension", muscle_groups: ["core"] }),
+  mk({ name: "Farmer Carry", pattern: "carry", equipment_types: ["kettlebell"], muscle_groups: ["forearms", "core"] }),
 ];
 const [sq, dl, pu, row, db, fc] = pool;
 const block = (e: Exercise, sets = 3) => ({
@@ -188,6 +192,90 @@ const goodPlan: PlanJson = {
   const qa = validatePlan(p, pool, [], "full_body_strength", 3);
   check("QA catches missing/thin progression + deload",
     !qa.checks.find((c) => c.name === "progression_defined")!.pass);
+}
+
+// ── Regressions for the fail-open bug ───────────────────────────────────
+// An unrecognized limitation tag used to be silently skipped, so a client
+// whose injury was logged under a typo got a completely unfiltered plan and
+// both the filter and the QA re-check reported it clean.
+{
+  const { unrecognized, excluded } = filterForLimitations([ohp, landmine, squat], ["lumbar_pain"]);
+  check("unknown limitation tag is reported rather than skipped",
+    unrecognized.length === 1 && unrecognized[0] === "lumbar_pain" && excluded.length === 0);
+}
+{
+  const qa = validatePlan(goodPlan, pool, ["not_a_real_injury"], "full_body_strength", 3);
+  check("QA fails loudly on an unrecognized limitation tag",
+    !qa.passed && !qa.checks.find((c) => c.name === "limitation_vocabulary")!.pass);
+}
+{
+  // [].every() is true, so an exercise declaring no equipment used to be
+  // usable by everyone — including a bodyweight-only remote client.
+  const { usable } = filterForEquipment([mk({ name: "Mystery", equipment_types: [] })], ["full_gym"]);
+  check("an exercise with no equipment listed fails closed", usable.length === 0);
+}
+{
+  // full_gym is an expansion set now, not a wildcard: a commercial gym does
+  // not necessarily own a sled.
+  const sled = mk({ name: "Sled Push", pattern: "conditioning", equipment_types: ["sled"] });
+  const { usable } = filterForEquipment([sled], ["full_gym"]);
+  check("full_gym does not unlock specialty equipment like a sled", usable.length === 0);
+}
+
+// ── Newly enforced programming rules ────────────────────────────────────
+{
+  // maxSameMuscleConsecutiveDays was declared on every workout type and read
+  // by nothing; quads could be hammered on four consecutive days.
+  const p = structuredClone(goodPlan);
+  // 6 sets of quad work on day 1, another 6 on day 2 — real emphasis twice
+  // in a row, as opposed to the incidental overlap full-body work always has.
+  p.sessions[0].blocks = [block(sq), block(sq), block(row), block(pu)];
+  p.sessions[1].blocks = [block(sq), block(sq), block(row), block(pu)];
+  const qa = validatePlan(p, pool, [], "full_body_strength", 3);
+  check("QA catches the same primary muscles on back-to-back days",
+    !qa.checks.find((c) => c.name === "recovery_spacing")!.pass);
+}
+{
+  const qa = validatePlan(goodPlan, pool, [], "full_body_strength", 3);
+  check("well-spaced plan passes recovery spacing",
+    qa.checks.find((c) => c.name === "recovery_spacing")!.pass);
+}
+{
+  // Beginner programming shouldn't prescribe near-maximal triples.
+  const p = structuredClone(goodPlan);
+  p.sessions[0].blocks[0].reps = "3";
+  const qa = validatePlan(p, pool, [], "beginner_foundations", 3);
+  check("QA catches sub-beginner rep ranges in beginner programming",
+    !qa.checks.find((c) => c.name === "rep_range_appropriate")!.pass);
+}
+{
+  // Time-based prescriptions have no rep count and must not be misread as a
+  // rep-range violation.
+  const p = structuredClone(goodPlan);
+  p.sessions[0].blocks[0].reps = "30s";
+  const qa = validatePlan(p, pool, [], "beginner_foundations", 3);
+  check("time-based prescriptions don't trip the rep-range check",
+    qa.checks.find((c) => c.name === "rep_range_appropriate")!.pass);
+}
+{
+  // pullToPushMin is 0 for lower_body, so the ratio check can never fail —
+  // reporting it as "passed" was a false assurance.
+  const qa = validatePlan(goodPlan, pool, [], "lower_body", 3);
+  const ratio = qa.checks.find((c) => c.name === "pull_push_ratio")!;
+  check("pull:push is reported as not applicable when no minimum is defined",
+    ratio.pass && ratio.detail.includes("Not applicable"));
+}
+{
+  // A single one-off session is legitimately shorter than a day inside a
+  // structured week; the multi-week floor was demoting good workouts.
+  const single: PlanJson = {
+    sessions: [{ day: 1, focus: "Mobility", blocks: [block(db, 2), block(fc, 2)] }],
+    progression_notes: "Add a set next time if this felt easy.",
+    exclusions: [],
+  };
+  const qa = validatePlan(single, pool, [], "full_body_strength", 1, 1, true);
+  check("a short single workout clears volume sanity",
+    qa.checks.find((c) => c.name === "volume_sanity")!.pass);
 }
 
 console.log(failures === 0 ? "\nALL UNIT TESTS PASSED" : `\n${failures} FAILURES`);

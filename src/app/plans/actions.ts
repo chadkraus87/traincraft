@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
 import { filterForLimitations, filterForEquipment, WORKOUT_TYPES, type LimitationTag } from "@/lib/safety/rules";
-import { validatePlan } from "@/lib/ai/validate";
+import { deriveQaForStoredPlan } from "@/lib/ai/plan-qa";
 import type { PlanJson, QaReport } from "@/lib/types";
 
 export async function deletePlan(form: FormData) {
@@ -26,57 +26,6 @@ export async function deletePlan(form: FormData) {
 }
 
 /**
- * Re-derives a stored plan's QA report from scratch, server-side.
- *
- * Every write path that touches a saved plan routes through here so the
- * qa_report column always reflects what the validator actually says about
- * the plan's *current* contents, evaluated against the *current* client.
- * Limitations, equipment, and the exercise pool are re-read from the
- * database on every call — a client whose injury was logged after the plan
- * was generated gets caught the next time the plan is touched.
- *
- * Critically, the caller never supplies the checks. They used to: the QA
- * report was accepted wholesale from the browser, which meant the record
- * asserting "this plan is safe to send" was written by the least
- * trustworthy party in the system.
- */
-async function deriveQaForStoredPlan(
-  supabase: Awaited<ReturnType<typeof supabaseServer>>,
-  planRow: {
-    client_id: string;
-    workout_type: string;
-    days_per_week: number;
-    is_single_workout?: boolean | null;
-  },
-  plan: PlanJson,
-  attempts: number
-): Promise<QaReport> {
-  const [{ data: limitations }, { data: equipment }, { data: pool }] = await Promise.all([
-    supabase.from("client_limitations").select("*").eq("client_id", planRow.client_id).eq("active", true),
-    supabase.from("client_equipment").select("*").eq("client_id", planRow.client_id),
-    supabase.from("exercises").select("*").eq("is_active", true),
-  ]);
-
-  const limitationTags = (limitations ?? []).map((l) => l.tag as LimitationTag);
-  const { allowed } = filterForLimitations(pool ?? [], limitationTags);
-  const ownedTypes = (equipment ?? []).map((e) => e.equipment_type);
-  const { usable } = filterForEquipment(allowed, ownedTypes);
-
-  return validatePlan(
-    plan,
-    usable,
-    limitationTags,
-    planRow.workout_type as keyof typeof WORKOUT_TYPES,
-    planRow.days_per_week,
-    attempts,
-    // Omitting this was a live bug: a one-off workout re-validated under the
-    // multi-week rules fails progression_defined (which demands the word
-    // "deload" and 80+ characters) and silently demotes a good plan to draft.
-    !!planRow.is_single_workout
-  );
-}
-
-/**
  * Logs what a client actually did for one exercise — optional, never
  * blocks anything else. This is what lets future generations reference
  * real history instead of a generic placeholder load.
@@ -89,20 +38,35 @@ async function deriveQaForStoredPlan(
  * mail app send actually completed. Honest audit trail, not a claim of
  * verified delivery.
  */
-export async function confirmDeliverySent(planId: string, channel: "email", destination: string) {
+export async function confirmDeliverySent(planId: string, channel: "email") {
   const supabase = await supabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not signed in");
 
-  await supabase.from("deliveries").insert({
+  // The destination is looked up from the plan's client rather than accepted
+  // from the browser. It used to be a parameter, which meant the delivery
+  // audit trail recorded whatever address the caller claimed — an audit
+  // record that the audited party writes is not an audit record.
+  const { data: planRow } = await supabase
+    .from("workout_plans")
+    .select("client_id, clients(email)")
+    .eq("id", planId)
+    .single();
+  if (!planRow) throw new Error("Plan not found");
+
+  const destination = (planRow.clients as unknown as { email: string | null } | null)?.email;
+  if (!destination) throw new Error("This client has no email address on file.");
+
+  const { error } = await supabase.from("deliveries").insert({
     trainer_id: user.id,
     plan_id: planId,
     channel,
     destination,
     status: "sent",
   });
+  if (error) throw new Error(error.message);
 
   revalidatePath(`/plans/${planId}`);
 }

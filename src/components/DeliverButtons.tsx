@@ -76,7 +76,7 @@ export default function DeliverButtons({
   };
 
   const confirmSent = async () => {
-    await confirmDeliverySent(planId, "email", clientEmail ?? "unknown");
+    await confirmDeliverySent(planId, "email");
     setAwaitingConfirm(false);
     setConfirmed(true);
   };

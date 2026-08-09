@@ -397,12 +397,48 @@ export function filterForLimitations<T extends ExerciseLike>(
 }
 
 /** Equipment gate: exercise usable only if every required type is in inventory. */
+/**
+ * What "full_gym" actually stands for.
+ *
+ * It used to be a wildcard: owning full_gym made every exercise usable,
+ * including ones needing a sled, ski erg, battle ropes, or a sandbag — gear
+ * most commercial gyms don't have. A trainer would get those programmed for
+ * a client who can't perform them. Enumerating the kit a standard commercial
+ * gym actually stocks keeps the pseudo-item useful without overpromising;
+ * anything outside this list has to be logged explicitly, the same as any
+ * other equipment.
+ */
+const FULL_GYM_INCLUDES = new Set<string>([
+  "barbell",
+  "dumbbell",
+  "kettlebell",
+  "band",
+  "bench",
+  "box",
+  "pullup_bar",
+  "rack",
+  "cable_machine",
+  "landmine",
+  "medicine_ball",
+  "yoga_mat",
+  "foam_roller",
+  "stability_ball",
+  "jump_rope",
+  "suspension",
+  "rower",
+  "treadmill",
+  "stationary_bike",
+  // Deliberately excluded: sled, ski_erg, battle_ropes, sandbag,
+  // outdoor_bike. A trainer whose gym has them can add them by name.
+  "full_gym",
+]);
+
 export function filterForEquipment<T extends ExerciseLike>(
   pool: T[],
   ownedTypes: string[]
 ): { usable: T[]; unusable: T[] } {
   const owned = new Set(ownedTypes.map((t) => t.toLowerCase()));
-  const fullGym = owned.has("full_gym");
+  if (owned.has("full_gym")) FULL_GYM_INCLUDES.forEach((t) => owned.add(t));
   const usable: T[] = [];
   const unusable: T[] = [];
   for (const ex of pool) {
@@ -415,10 +451,9 @@ export function filterForEquipment<T extends ExerciseLike>(
     // programmable by everybody.
     const ok =
       ex.equipment_types.length > 0 &&
-      (fullGym ||
-        ex.equipment_types.every(
-          (t) => t.toLowerCase() === "bodyweight" || owned.has(t.toLowerCase())
-        ));
+      ex.equipment_types.every(
+        (t) => t.toLowerCase() === "bodyweight" || owned.has(t.toLowerCase())
+      );
     (ok ? usable : unusable).push(ex);
   }
   return { usable, unusable };

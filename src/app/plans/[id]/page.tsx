@@ -7,7 +7,9 @@ import DeletePlanButton from "@/components/DeletePlanButton";
 import SaveTemplateButton from "@/components/SaveTemplateButton";
 import QaReportEditor from "@/components/QaReportEditor";
 import PlanEditor from "@/components/PlanEditor";
-import type { PlanJson, QaReport } from "@/lib/types";
+import type { PlanJson, QaCheck, QaReport } from "@/lib/types";
+import { deriveQaForStoredPlan, isDeliverable } from "@/lib/ai/plan-qa";
+import { QA_CHECK_LABELS } from "@/lib/ai/validate";
 
 export default async function PlanView({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,7 +20,6 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
 
   const plan = planRow.plan as PlanJson;
   const qa = planRow.qa_report as QaReport | null;
-  const deliverable = planRow.status === "final" || qa?.trainerConfirmed === true;
   const client = planRow.clients;
 
   // Same safety + equipment filter the generator uses, recomputed here so
@@ -33,6 +34,29 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
   const { allowed } = filterForLimitations(exercisePool ?? [], limitationTags);
   const ownedTypes = (equipment ?? []).map((e) => e.equipment_type);
   const { usable } = filterForEquipment(allowed, ownedTypes);
+
+  // Re-validate the stored plan against the client as they are RIGHT NOW.
+  //
+  // qa_report is a snapshot taken at generation time. If the trainer logs a
+  // shoulder impingement two weeks later, the plan keeps displaying "QA
+  // passed" in green and keeps listing the overhead press that is now
+  // contraindicated — the safety engine has an answer, nobody re-asked it.
+  // The check is pure and the pool is already loaded for the editor picker,
+  // so re-running it here costs nothing.
+  //
+  // The stored report stays authoritative for the review UI (it carries the
+  // trainer's notes and dismissals); this only drives the warning banner.
+  const liveQa = await deriveQaForStoredPlan(supabase, planRow, plan, qa?.attempts ?? 1);
+  const newlyFailing = liveQa.checks.filter(
+    (c) => !c.pass && qa?.checks.find((s) => s.name === c.name)?.pass !== false
+  );
+  const staleQa = newlyFailing.length > 0;
+
+  // A prior sign-off covered the plan as it was against the client as they
+  // were. A newly-logged injury invalidates it, so a regression blocks
+  // delivery regardless of what the stored report says. Same helper the PDF
+  // route uses, so the URL can't be used to route around this.
+  const deliverable = isDeliverable(qa, liveQa);
 
   const { data: deliveries } = await supabase
     .from("deliveries")
@@ -95,6 +119,34 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
           <DeletePlanButton planId={planRow.id} clientId={client.id} planTitle={planRow.title} />
         </div>
       </div>
+
+      {staleQa && (
+        <div className="card mb-4 border-l-4 border-alarm">
+          <h2 className="display text-sm text-alarm mb-1">
+            This client has changed since the plan was built
+          </h2>
+          <p className="text-sm text-steel mb-2">
+            Re-checking the plan against {client.full_name}&apos;s current limitations and equipment
+            turns up {newlyFailing.length} issue{newlyFailing.length > 1 ? "s" : ""} that
+            {newlyFailing.length > 1 ? " were" : " was"} not present when it was generated:
+          </p>
+          <ul className="text-sm space-y-1 mb-3">
+            {newlyFailing.map((c) => (
+              <li key={c.name} className="flex gap-2">
+                <span className="text-alarm shrink-0">✗</span>
+                <span>
+                  <span className="font-medium">{QA_CHECK_LABELS[c.name] ?? c.name}</span>
+                  <span className="text-steel"> — {c.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-steel">
+            Edit the plan to resolve these — saving re-runs the full safety check. Sending is
+            blocked until then.
+          </p>
+        </div>
+      )}
 
       {qa && <QaReportEditor planId={planRow.id} initialQa={qa} />}
 

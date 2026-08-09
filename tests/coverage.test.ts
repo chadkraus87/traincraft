@@ -113,6 +113,39 @@ async function main() {
     }
   }
 
+  // ── Named modalities must survive their own limitation ────────────────
+  //
+  // The satisfiability matrix above only checks movement *patterns*, and a
+  // whole modality can disappear without emptying a pattern. Migration 0018
+  // did exactly that four times over: it left neck-pain clients with zero
+  // bridges of any kind, hypertensive and prenatal clients with zero loaded
+  // carries, and FAI clients with five abduction exercises and no adduction
+  // ones — encoding the very imbalance conservative FAI management exists to
+  // correct. Every pattern check still passed.
+  //
+  // Each pair below is a movement family that is specifically *indicated*
+  // for that limitation, so losing it entirely is a signal that tagging has
+  // over-reached rather than a sign of caution.
+  const MUST_SURVIVE: { tag: string; family: string; match: RegExp }[] = [
+    { tag: "neck_pain", family: "bridges", match: /bridge|hip thrust/i },
+    { tag: "hypertension_uncontrolled", family: "loaded carries", match: /carry/i },
+    { tag: "pregnancy_2nd_3rd_trimester", family: "loaded carries", match: /carry/i },
+    { tag: "hip_impingement", family: "adductor work", match: /adduction|adductor/i },
+    { tag: "elbow_tendinopathy", family: "wrist loading (the rehab)", match: /wrist (curl|extension)/i },
+    { tag: "hypertension_uncontrolled", family: "yoga strength poses", match: /warrior|chair pose/i },
+    { tag: "low_back_pain", family: "carries and sleds", match: /carry|sled/i },
+    { tag: "lumbar_disc_injury", family: "hinge patterning", match: /bridge|hip hinge|glute/i },
+  ];
+  for (const { tag, family, match } of MUST_SURVIVE) {
+    const { allowed } = filterForLimitations(pool, [tag]);
+    const survivors = allowed.filter((e) => match.test(e.name));
+    check(
+      survivors.length > 0,
+      `${tag} retains ${family} (${survivors.length} available)`,
+      `${tag} excludes ALL ${family}. That family is indicated for this limitation — over-tagging, not caution.`
+    );
+  }
+
   // ── Unrecognized limitation tags must fail closed ─────────────────────
   // The regression guard for the worst bug this engine has had: an unknown
   // tag used to be skipped, so a client whose injury was logged under a

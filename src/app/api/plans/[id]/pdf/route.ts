@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { planToPdf } from "@/lib/pdf";
 import { getTrainerBrand } from "@/lib/brand-server";
-import type { QaReport } from "@/lib/types";
+import type { PlanJson, QaReport } from "@/lib/types";
+import { deriveQaForStoredPlan, isDeliverable } from "@/lib/ai/plan-qa";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,19 +23,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .single();
   if (!plan) return NextResponse.json({ error: "Plan not found" }, { status: 404 });
 
-  // QA gates delivery. A plan is sendable when the validator cleared it, or
-  // when the trainer has reviewed the open flags and taken responsibility
-  // for them. Without this the PDF endpoint would hand out a plan that
-  // failed a contraindication check to anyone who guessed the URL of their
-  // own draft — and the whole point of the QA pass is that unvalidated
-  // output doesn't reach a client.
-  const qa = plan.qa_report as QaReport | null;
-  const deliverable = plan.status === "final" || qa?.trainerConfirmed === true;
-  if (!deliverable) {
+  // QA gates delivery, and the verdict is recomputed here rather than read
+  // off the stored status. Two reasons: a stored "final" can be stale (the
+  // client may have had an injury logged since the plan was built), and this
+  // endpoint must not be a way around the same gate the UI applies. The
+  // trainer's recorded sign-off is still honoured for flags they reviewed.
+  const storedQa = plan.qa_report as QaReport | null;
+  const liveQa = await deriveQaForStoredPlan(supabase, plan, plan.plan as PlanJson, storedQa?.attempts ?? 1);
+  if (!isDeliverable(storedQa, liveQa)) {
     return NextResponse.json(
       {
         error:
-          "This plan hasn't cleared QA yet. Open it, review the flagged checks, and confirm it's safe to send — then you can download the PDF.",
+          "This plan hasn't cleared QA. Open it in CoachRhythm, review the flagged checks, and confirm it's safe to send — then you can download the PDF.",
       },
       { status: 409 }
     );
