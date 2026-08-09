@@ -50,20 +50,10 @@ contraindications and QA-checked before the trainer sees it.
    fine.
 
 ## Commands
-```
+```bash
 npm run dev
 npm run lint
 npm run test              # unit
 npm run test:db           # database/RLS tests
 npm run test:e2e          # Playwright
 npm run check:migrations  # verifies migrations are append-only
-```
-Run `lint` and `test` before committing. Run `test:db` after touching any policy
-or migration, and `check:migrations` before pushing schema changes.
-
-## Gotchas
-- App Router server/client component boundaries: anything importing the Supabase
-  service client must stay server-side.
-- A failed QA path can mean two Claude calls in one request; everything must
-  finish within `maxDuration`. Client forms treat a non-JSON response as a likely
-  timeout—see `GenerateForm` / `BuildWorkoutForm`.
