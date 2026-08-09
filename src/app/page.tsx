@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { LIMITATION_LABELS } from "@/lib/safety/rules";
+import { PRODUCT } from "@/lib/brand";
 
 const RING_RADIUS = 30;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -16,9 +17,12 @@ export default async function Dashboard({
   if (!user) {
     return (
       <div className="card max-w-md mx-auto mt-16 text-center">
-        <h1 className="display text-2xl mb-2">Welcome to TrainCraft</h1>
-        <p className="text-sm text-steel mb-4">Sign in to manage your clients and build plans.</p>
-        <Link href="/login" className="btn">Sign in</Link>
+        <h1 className="display text-2xl mb-2">Welcome to {PRODUCT.name}</h1>
+        <p className="text-sm text-steel mb-4">{PRODUCT.tagline}</p>
+        <div className="flex gap-2 justify-center">
+          <Link href="/login" className="btn">Sign in</Link>
+          <Link href="/signup" className="btn-ghost">Create an account</Link>
+        </div>
       </div>
     );
   }

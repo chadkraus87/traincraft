@@ -44,18 +44,40 @@ export async function POST(req: Request) {
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
   const limitationTags = (limitations ?? []).map((l) => l.tag as LimitationTag);
-  const { allowed } = filterForLimitations(pool ?? [], limitationTags);
+  const { allowed, excluded } = filterForLimitations(pool ?? [], limitationTags);
   const ownedTypes = (equipment ?? []).map((e) => e.equipment_type);
   const { usable } = filterForEquipment(allowed, ownedTypes);
 
-  const plan = template.plan as PlanJson;
+  // Exclusions are recomputed for THIS client, never copied from the
+  // template. saveAsTemplate strips them on the way in for the same reason:
+  // an exclusion list is a statement about one person's injuries, and
+  // printing another client's medical rationale on this client's plan would
+  // be both wrong and a privacy breach.
+  const templatePlan = template.plan as PlanJson;
+  const plan: PlanJson = {
+    ...templatePlan,
+    exclusions: excluded.map((e) => ({
+      exercise_name: e.exercise_name,
+      limitation_tag: e.limitation_tag,
+      reason: e.reason,
+      prefer_instead: e.prefer_instead,
+    })),
+  };
+
+  // A template saved from a one-off workout is still a one-off workout.
+  // Hardcoding false here (and omitting the flag from validatePlan) made
+  // single-session templates fail the multi-week progression check on
+  // every application, landing them as drafts for no real reason.
+  const isSingleWorkout = template.days_per_week === 1 && template.weeks === 1;
 
   const qa = validatePlan(
     plan,
     usable,
     limitationTags,
     template.workout_type as keyof typeof WORKOUT_TYPES,
-    template.days_per_week
+    template.days_per_week,
+    1,
+    isSingleWorkout
   );
 
   const { data: saved, error } = await supabase
@@ -70,7 +92,7 @@ export async function POST(req: Request) {
       status: qa.passed ? "final" : "draft",
       plan,
       qa_report: qa,
-      is_single_workout: false,
+      is_single_workout: isSingleWorkout,
     })
     .select("id")
     .single();

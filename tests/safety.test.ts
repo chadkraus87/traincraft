@@ -40,13 +40,18 @@ check(
   orphanSeedTags.length === 0,
   `orphans: ${orphanSeedTags.join(", ")}`
 );
-const unusedRuleTags = [...ruleTags].filter((t) => !seedTags.has(t));
-check(
-  "rule tags unused by any seed exercise (informational, ok for custom exercises)",
-  true,
-  ""
-);
-if (unusedRuleTags.length) console.log(`  note: rule-only tags: ${unusedRuleTags.join(", ")}`);
+// The reverse direction — a rule tag no exercise carries — used to be
+// asserted here as a hardcoded `true` labelled "informational". That soft
+// pass is why hip_impingement shipped screening 2 exercises out of 543 and
+// elbow_tendinopathy 9, with a green suite: a rule naming tags nothing
+// carries excludes nothing, which is the dangerous direction of this
+// invariant, not the harmless one.
+//
+// It is now a hard failure, but it lives in tests/coverage.test.ts because
+// tagging is no longer visible to a regex over the seed SQL — migration 0018
+// applies tags via UPDATE, so only a real database knows a row's final tag
+// set. That test also enforces a per-limitation coverage floor.
+console.log("SKIP  rule-tag coverage — asserted against a real DB in tests/coverage.test.ts (npm run test:db)");
 
 // ── Category coverage ────────────────────────────────────────────────
 import { EXERCISE_CATEGORIES } from "../src/lib/safety/rules";

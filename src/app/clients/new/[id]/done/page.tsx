@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import WizardSteps from "@/components/WizardSteps";
 
 export default async function OnboardingDone({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await supabaseServer();
+  await requireUser();
   const { data: client } = await supabase.from("clients").select("full_name").eq("id", id).single();
 
   return (

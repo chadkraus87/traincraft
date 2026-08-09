@@ -1,7 +1,9 @@
 import { createClientForOnboarding } from "../actions";
 import WizardSteps from "@/components/WizardSteps";
+import { requireUser } from "@/lib/auth";
 
-export default function NewClientWizardStart() {
+export default async function NewClientWizardStart() {
+  await requireUser();
   return (
     <div className="max-w-xl mx-auto">
       <h1 className="display text-3xl mb-2">Add a client — guided setup</h1>

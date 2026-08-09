@@ -12,9 +12,37 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildWorkout } from "@/lib/ai/builder";
 import { validatePlan } from "@/lib/ai/validate";
-import { WORKOUT_TYPES, type LimitationTag } from "@/lib/safety/rules";
+import { WORKOUT_TYPES, EQUIPMENT_TYPES, type LimitationTag } from "@/lib/safety/rules";
+import type { QaReport } from "@/lib/types";
+import { z } from "zod";
 
 export const maxDuration = 120;
+
+/**
+ * Per-trainer generation quota. Enforced against generation_events rather
+ * than process memory, because serverless instances are recycled and
+ * requests fan out — a module-level counter would reset constantly and
+ * enforce nothing.
+ */
+const RATE_LIMIT = 30;
+const RATE_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * weeks and daysPerWeek used to be read straight off the body with no upper
+ * bound, and both feed prompt size and completion length. `daysPerWeek: 60`
+ * was a valid request that inflated every token count on the operator's
+ * bill. Bounds are what a human trainer would actually program.
+ */
+const GenerateRequest = z.object({
+  clientId: z.string().uuid("must be a valid client id"),
+  workoutType: z.enum(Object.keys(WORKOUT_TYPES) as [string, ...string[]]),
+  weeks: z.number().int().min(1).max(12).default(4),
+  daysPerWeek: z.number().int().min(1).max(7).default(3),
+  title: z.string().trim().max(200).optional(),
+  extraInstructions: z.string().trim().max(2000).optional(),
+  extraEquipmentTypes: z.array(z.enum(EQUIPMENT_TYPES)).max(EQUIPMENT_TYPES.length).optional(),
+  isSingleWorkout: z.boolean().optional(),
+});
 
 export async function POST(req: Request) {
   const supabase = await supabaseServer();
@@ -23,19 +51,44 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
+  // Rate limit before doing any work. Each request costs one or two Claude
+  // calls against a shared API key, so an unbounded endpoint lets any
+  // account drain the budget for everyone.
+  const windowStart = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+  const { count: recentCount } = await supabase
+    .from("generation_events")
+    .select("id", { count: "exact", head: true })
+    .eq("trainer_id", user.id)
+    .gte("created_at", windowStart);
+
+  if ((recentCount ?? 0) >= RATE_LIMIT) {
+    return NextResponse.json(
+      {
+        error: `You've generated ${RATE_LIMIT} plans in the last hour, which is the current limit. Try again shortly — this cap is here so one busy account can't slow generation down for everyone.`,
+      },
+      { status: 429 }
+    );
+  }
+
   const body = await req.json();
+  const parsed = GenerateRequest.safeParse(body);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return NextResponse.json(
+      { error: `${first.path.join(".") || "request"}: ${first.message}` },
+      { status: 400 }
+    );
+  }
   const {
     clientId,
     workoutType,
-    weeks: requestedWeeks = 4,
-    daysPerWeek: requestedDays = 3,
+    weeks: requestedWeeks,
+    daysPerWeek: requestedDays,
     title,
     extraInstructions,
     extraEquipmentTypes,
     isSingleWorkout,
-  } = body;
-  if (!clientId || !WORKOUT_TYPES[workoutType])
-    return NextResponse.json({ error: "clientId and valid workoutType required" }, { status: 400 });
+  } = parsed.data;
 
   const weeks = isSingleWorkout ? 1 : requestedWeeks;
   const daysPerWeek = isSingleWorkout ? 1 : requestedDays;
@@ -110,6 +163,17 @@ export async function POST(req: Request) {
     recentNotes: recentNotesText || undefined,
   };
 
+  // Logged before the Claude calls, not after, so a request that times out
+  // or throws still counts against the quota. Counting only successes would
+  // let a loop of failing requests bill indefinitely.
+  await supabase.from("generation_events").insert({
+    trainer_id: user.id,
+    client_id: clientId,
+    workout_type: workoutType,
+    weeks,
+    days_per_week: daysPerWeek,
+  });
+
   try {
     // Attempt 1
     let { plan, allowedPool } = await buildWorkout(input);
@@ -123,7 +187,7 @@ export async function POST(req: Request) {
         extraInstructions: `${extraInstructions ?? ""}\nPREVIOUS ATTEMPT FAILED QA — fix these exactly: ${failures}`,
       });
       const retryQa = validatePlan(retry.plan, retry.allowedPool, limitationTags, workoutType, daysPerWeek, 2, !!isSingleWorkout);
-      if (retryQa.passed || countPasses(retryQa) >= countPasses(qa)) {
+      if (isBetterAttempt(retryQa, qa)) {
         plan = retry.plan;
         qa = retryQa;
       }
@@ -156,6 +220,32 @@ export async function POST(req: Request) {
     const msg = e instanceof Error ? e.message : "Generation failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+/**
+ * Decides whether the retry is genuinely better than the first attempt.
+ *
+ * Counting passed checks alone treats every check as equally important,
+ * which they are not. pool_membership failing means the model invented an
+ * exercise id that was never screened against this client's injuries — the
+ * one failure that can put an unvetted movement in front of a real person.
+ * Under a plain count, a retry that fixed movement_balance but broke
+ * pool_membership scored equal and won the tie, swapping a merely
+ * unbalanced plan for an unsafe one.
+ *
+ * So: never trade away pool_membership, and only take the retry on a strict
+ * improvement otherwise. Ties go to the first attempt.
+ */
+const GATING_CHECKS = ["pool_membership", "contraindications"] as const;
+
+function isBetterAttempt(retry: QaReport, first: QaReport): boolean {
+  const gateOk = (r: QaReport) =>
+    GATING_CHECKS.every((name) => r.checks.find((c) => c.name === name)?.pass !== false);
+
+  if (!gateOk(retry)) return false;
+  if (!gateOk(first)) return true;
+  if (retry.passed) return true;
+  return countPasses(retry) > countPasses(first);
 }
 
 function countPasses(r: { checks: { pass: boolean }[] }) {

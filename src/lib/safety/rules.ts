@@ -69,14 +69,24 @@ export const CONTRAINDICATIONS: Record<LimitationTag, ContraRule> = {
     // Tag-based, not pattern-based: scapular-plane vertical pressing (landmine)
     // is the recommended substitute and must survive the filter.
     avoidPatterns: [],
-    avoidExerciseTags: ["overhead", "behind_neck", "deep_shoulder_flexion"],
+    // "dip" was previously only avoided for rotator cuff work, but deep
+    // dipping is a primary subacromial provoker too — the two rules were
+    // inconsistent in a way that let Bench Dips through for impingement.
+    // "behind_neck" was removed: no exercise in the library is a behind-the-
+    // neck movement, so the tag excluded nothing while reading like it did.
+    // Re-add it together with the exercise that warrants it — the coverage
+    // test fails on any rule tag that matches zero rows.
+    avoidExerciseTags: ["overhead", "deep_shoulder_flexion", "dip"],
     rationale:
-      "Overhead pressing narrows the subacromial space and reproduces impingement symptoms.",
+      "Overhead pressing narrows the subacromial space and reproduces impingement symptoms; abduction and flexion through the painful arc do the same.",
     preferInstead: "Landmine or incline pressing in the scapular plane; loaded carries.",
   },
   rotator_cuff_injury: {
     avoidPatterns: ["push_vertical"],
-    avoidExerciseTags: ["overhead", "dip", "wide_grip_press", "kipping"],
+    // "wide_grip_press" and "kipping" removed for the same reason as
+    // behind_neck above: the library has no wide-grip or kipping variants,
+    // so both tags matched nothing.
+    avoidExerciseTags: ["overhead", "dip"],
     rationale:
       "End-range overhead and deep-stretch pressing overload healing cuff tissue.",
     preferInstead: "Neutral-grip floor press, external rotation work, rows.",
@@ -89,7 +99,17 @@ export const CONTRAINDICATIONS: Record<LimitationTag, ContraRule> = {
     preferInstead: "Hip hinge patterning at moderate load, bird dogs, dead bugs, carries.",
   },
   lumbar_disc_injury: {
-    avoidPatterns: ["core_flexion", "hinge"],
+    // "hinge" used to be banned wholesale, which removed all 61 hinge
+    // exercises — including glute bridges, leg curls, and hip abduction
+    // work, i.e. exactly the posterior-chain rehab this rule's own
+    // preferInstead recommends. It also made every workout type that
+    // requires a hinge pattern impossible to satisfy, so those plans could
+    // never pass QA and were permanently flagged as drafts. Trainers learn
+    // fast to ignore a flag that is always on, which costs more safety than
+    // the blanket ban ever bought. Loading is now excluded by tag, so heavy
+    // and flexed/rotated hinging is still filtered while unloaded hinge
+    // patterning survives.
+    avoidPatterns: ["core_flexion"],
     avoidExerciseTags: ["heavy_spinal_load", "loaded_flexion", "loaded_rotation", "high_impact"],
     rationale:
       "Flexion + compression + rotation is the disc-injury mechanism; avoid loading it until cleared.",
@@ -103,7 +123,12 @@ export const CONTRAINDICATIONS: Record<LimitationTag, ContraRule> = {
     preferInstead: "Box squats to a high box, hip-dominant work, step-ups in pain-free range.",
   },
   acl_recovery: {
-    avoidPatterns: ["conditioning"],
+    // Banning the whole "conditioning" pattern removed all 97 conditioning
+    // exercises, including the low-impact cyclical work (rower, bike, ski
+    // erg) that is a staple of ACL rehab — and made fat-loss plans
+    // unsatisfiable. The impact/pivot tags below are what actually matter
+    // for graft protection, and they still apply.
+    avoidPatterns: [],
     avoidExerciseTags: ["high_impact", "cutting", "knee_dominant_plyo", "deep_knee_flexion"],
     rationale:
       "Impact, deceleration, and pivoting load the graft before it is remodeled; progress under clinician guidance only.",
@@ -135,9 +160,13 @@ export const CONTRAINDICATIONS: Record<LimitationTag, ContraRule> = {
     preferInstead: "Supported single-leg balance, calf/tibialis strength, sled work.",
   },
   neck_pain: {
-    avoidPatterns: [],
-    avoidExerciseTags: ["overhead", "behind_neck", "neck_load", "bridging_neck"],
-    rationale: "Cervical loading and end-range overhead positions commonly reproduce symptoms.",
+    // Repeated loaded cervical flexion (crunches, sit-ups) is the most
+    // commonly reported gym aggravator for neck pain, and nothing was
+    // catching it — the rule ran almost entirely on the "overhead" tag.
+    avoidPatterns: ["core_flexion"],
+    avoidExerciseTags: ["overhead", "neck_load", "bridging_neck"],
+    rationale:
+      "Cervical loading, end-range overhead positions, and repeated loaded neck flexion commonly reproduce symptoms.",
     preferInstead: "Supported rows, chest-supported work, scap strength.",
   },
   hypertension_uncontrolled: {
@@ -156,7 +185,10 @@ export const CONTRAINDICATIONS: Record<LimitationTag, ContraRule> = {
   },
   osteoporosis: {
     avoidPatterns: ["core_flexion"],
-    avoidExerciseTags: ["loaded_flexion", "loaded_rotation", "high_impact"],
+    // heavy_spinal_load was missing: the core_flexion pattern ban catches
+    // crunches, but left Good Mornings and bent-over rows — sustained loaded
+    // flexion, the exact vertebral-fracture mechanism the rationale names.
+    avoidExerciseTags: ["loaded_flexion", "loaded_rotation", "high_impact", "heavy_spinal_load"],
     rationale:
       "Loaded spinal flexion/rotation raises vertebral fracture risk; moderate progressive loading is beneficial, end-range spine loading is not.",
     preferInstead: "Hinge patterning, carries, moderate-impact loading if cleared.",
@@ -314,15 +346,35 @@ export interface Exclusion {
   prefer_instead?: string;
 }
 
-/** Deterministically split a candidate pool into allowed / excluded for a client. */
+/** True when a string is part of the controlled limitation vocabulary. */
+export function isKnownLimitationTag(tag: string): tag is LimitationTag {
+  return (LIMITATION_TAGS as readonly string[]).includes(tag);
+}
+
+/**
+ * Deterministically split a candidate pool into allowed / excluded for a client.
+ *
+ * `unrecognized` holds any limitation tag with no rule behind it. It is
+ * returned rather than skipped because skipping it fails OPEN: a tag we
+ * don't understand used to mean "exclude nothing for this limitation", so a
+ * client whose injury was recorded under a typo'd or renamed tag silently
+ * received a completely unfiltered plan — and the QA re-check, sharing the
+ * same skip, agreed that everything was fine.
+ *
+ * `client_limitations.tag` is a bare text column, so this is reachable from
+ * a hand-posted form, and inevitable the first time a tag in LIMITATION_TAGS
+ * is renamed without a data migration. Callers must treat a non-empty
+ * `unrecognized` as a hard stop, never as a warning.
+ */
 export function filterForLimitations<T extends ExerciseLike>(
   pool: T[],
-  limitations: LimitationTag[]
-): { allowed: T[]; excluded: Exclusion[] } {
+  limitations: readonly string[]
+): { allowed: T[]; excluded: Exclusion[]; unrecognized: string[] } {
+  const unrecognized = [...new Set(limitations.filter((t) => !isKnownLimitationTag(t)))];
   const excluded: Exclusion[] = [];
   const allowed = pool.filter((ex) => {
     for (const tag of limitations) {
-      const rule = CONTRAINDICATIONS[tag];
+      const rule = CONTRAINDICATIONS[tag as LimitationTag];
       if (!rule) continue;
       const patternHit = rule.avoidPatterns.includes(ex.pattern);
       const tagHit = ex.contraindication_tags.some((t) =>
@@ -332,7 +384,7 @@ export function filterForLimitations<T extends ExerciseLike>(
         excluded.push({
           exercise_id: ex.id,
           exercise_name: ex.name,
-          limitation_tag: tag,
+          limitation_tag: tag as LimitationTag,
           reason: rule.rationale,
           prefer_instead: rule.preferInstead,
         });
@@ -341,7 +393,7 @@ export function filterForLimitations<T extends ExerciseLike>(
     }
     return true;
   });
-  return { allowed, excluded };
+  return { allowed, excluded, unrecognized };
 }
 
 /** Equipment gate: exercise usable only if every required type is in inventory. */
@@ -354,11 +406,19 @@ export function filterForEquipment<T extends ExerciseLike>(
   const usable: T[] = [];
   const unusable: T[] = [];
   for (const ex of pool) {
+    // [].every() is true, so an exercise with no equipment listed used to be
+    // usable by everyone — including a bodyweight-only remote client who
+    // owns none of what it actually needs. A custom exercise whose equipment
+    // field is typed as a stray comma reduces to [] after filtering, so this
+    // is reachable in practice. Unknown requirements fail closed: an
+    // exercise that declares nothing is programmable by nobody, rather than
+    // programmable by everybody.
     const ok =
-      fullGym ||
-      ex.equipment_types.every(
-        (t) => t === "bodyweight" || owned.has(t.toLowerCase())
-      );
+      ex.equipment_types.length > 0 &&
+      (fullGym ||
+        ex.equipment_types.every(
+          (t) => t.toLowerCase() === "bodyweight" || owned.has(t.toLowerCase())
+        ));
     (ok ? usable : unusable).push(ex);
   }
   return { usable, unusable };

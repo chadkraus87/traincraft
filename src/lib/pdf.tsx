@@ -4,12 +4,21 @@ import path from "path";
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import type { Client, PlanJson } from "@/lib/types";
 import { LIMITATION_LABELS } from "@/lib/safety/rules";
+import { PRODUCT, type TrainerBrand } from "@/lib/brand";
 
 // The logo's own background is solid black (no transparency), so rather
 // than trying to fake a blend onto the white page, it sits in a header
 // band that matches — reads as an intentional brand block, not an
 // artifact.
-const LOGO_PATH = path.join(process.cwd(), "public", "chad-kraus-logo.png");
+const LOGO_PATH = path.join(process.cwd(), "public", PRODUCT.logoFile);
+
+// The measurement chart is not laid out here. It's a designed, fillable
+// AcroForm PDF shipped as an asset — see measurementChartToFillablePdf.
+const MEASUREMENT_CHART_TEMPLATE = path.join(
+  process.cwd(),
+  "public",
+  "measurement-chart-template.pdf"
+);
 
 const s = StyleSheet.create({
   page: { padding: 0, fontSize: 10, fontFamily: "Helvetica", color: "#16211B" },
@@ -31,146 +40,23 @@ const s = StyleSheet.create({
   boxTitle: { fontFamily: "Helvetica-Bold", marginBottom: 4 },
   prog: { marginTop: 16, padding: 10, backgroundColor: "#F0F4F1" },
   foot: { position: "absolute", bottom: 20, left: 36, right: 36, fontSize: 7, color: "#999" },
-
-  // Measurement chart — matches a supplied reference design: black header
-  // with an accent bar below, black section headers with an orange
-  // left-edge tab and a small green dot, two/three-column bordered
-  // fill-in fields.
-  mcHeader: { backgroundColor: "#000000", paddingVertical: 18, paddingHorizontal: 36, flexDirection: "row", alignItems: "center", gap: 14 },
-  mcAccentBar: { height: 4, backgroundColor: "#4C9A2A" },
-  mcTitle: { color: "#F7F0E6", fontSize: 20, fontFamily: "Helvetica-Bold", letterSpacing: 0.5 },
-  mcCreds: { color: "#EC6B3A", fontSize: 11, fontFamily: "Helvetica-Bold", marginTop: 3, letterSpacing: 0.5 },
-  mcTagline: { color: "#CFCABF", fontSize: 8, marginTop: 3 },
-  mcSection: { backgroundColor: "#000000", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 6, paddingHorizontal: 10, marginTop: 16, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: "#EC6B3A" },
-  mcSectionTitle: { color: "#FFFFFF", fontSize: 10, fontFamily: "Helvetica-Bold", letterSpacing: 0.5 },
-  mcDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#4C9A2A" },
-  mcGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  mcField: { borderWidth: 1, borderColor: "#CCC", padding: 6, height: 34, justifyContent: "flex-start" },
-  mcFieldLabel: { fontSize: 8, fontFamily: "Helvetica-Bold" },
-  mcFieldValue: { fontSize: 10, marginTop: 3 },
-  mcWideField: { borderWidth: 1, borderColor: "#CCC", padding: 6, height: 44, marginBottom: 4 },
-  mcNotesBox: { borderWidth: 1, borderColor: "#CCC", height: 130 },
-  mcFoot: { position: "absolute", bottom: 24, left: 36, right: 36, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  mcFootLeft: { fontSize: 7, color: "#999", width: "60%" },
-  mcFootRight: { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#EC6B3A" },
 });
 
-interface MCField { label: string; value?: string; }
-
-function MeasurementField({ field, widthPct }: { field: MCField; widthPct: number }) {
-  return (
-    <View style={[s.mcField, { width: `${widthPct}%` }]}>
-      <Text style={s.mcFieldLabel}>{field.label}:</Text>
-      {field.value ? <Text style={s.mcFieldValue}>{field.value}</Text> : null}
-    </View>
-  );
-}
-
-function MeasurementSection({ title, fields, cols }: { title: string; fields: MCField[]; cols: number }) {
-  const widthPct = 100 / cols - 1.5;
-  return (
-    <View wrap={false}>
-      <View style={s.mcSection}>
-        <Text style={s.mcSectionTitle}>{title}</Text>
-        <View style={s.mcDot} />
-      </View>
-      <View style={s.mcGrid}>
-        {fields.map((f) => <MeasurementField key={f.label} field={f} widthPct={widthPct} />)}
-      </View>
-    </View>
-  );
-}
-
-export async function measurementChartToPdf(clientName: string) {
-  const doc = (
-    <Document>
-      <Page size="LETTER" style={s.page}>
-        <View style={s.mcHeader} fixed>
-          <Image src={LOGO_PATH} style={s.logo} />
-          <View>
-            <Text style={s.mcTitle}>BODY MEASUREMENT CHART</Text>
-            <Text style={s.mcCreds}>CHAD KRAUS  |  CPT | PES | CNC | VCS</Text>
-            <Text style={s.mcTagline}>Client assessment and progress tracking</Text>
-          </View>
-        </View>
-        <View style={s.mcAccentBar} fixed />
-
-        <View style={s.body}>
-          <MeasurementSection
-            title="CLIENT INFORMATION"
-            cols={2}
-            fields={[
-              { label: "Client name", value: clientName },
-              { label: "Date of birth" },
-              { label: "Phone / email" },
-              { label: "Assessment date" },
-              { label: "Sex" },
-              { label: "Coach", value: "Chad Kraus" },
-            ]}
-          />
-          <View style={s.mcWideField}>
-            <Text style={s.mcFieldLabel}>Relevant medical history / considerations:</Text>
-          </View>
-
-          <MeasurementSection
-            title="BODY COMPOSITION"
-            cols={3}
-            fields={[
-              { label: "Height" }, { label: "Weight" }, { label: "BMI" },
-              { label: "Body fat %" }, { label: "Lean mass" }, { label: "Resting heart rate" },
-            ]}
-          />
-
-          <MeasurementSection
-            title="BODY CIRCUMFERENCE"
-            cols={2}
-            fields={[
-              { label: "Neck" }, { label: "Mid upper arm" },
-              { label: "Chest / bust" }, { label: "Hip" },
-              { label: "Waist" }, { label: "Mid-thigh" },
-              { label: "Abdomen" }, { label: "Calf" },
-            ]}
-          />
-
-          <MeasurementSection
-            title="SKINFOLD MEASUREMENTS"
-            cols={2}
-            fields={[
-              { label: "Biceps" }, { label: "Triceps" },
-              { label: "Iliac crest" }, { label: "Thigh" },
-              { label: "Abdomen" }, { label: "Subscapular" },
-              { label: "Chest" }, { label: "Calf" },
-            ]}
-          />
-
-          <View wrap={false}>
-            <View style={s.mcSection}>
-              <Text style={s.mcSectionTitle}>ASSESSMENT NOTES AND GOALS</Text>
-              <View style={s.mcDot} />
-            </View>
-            <View style={s.mcNotesBox} />
-          </View>
-        </View>
-
-        <View style={s.mcFoot} fixed>
-          <Text style={s.mcFootLeft}>Measurements should be taken consistently using the same method, equipment, and conditions.</Text>
-          <Text style={s.mcFootRight}>CHAD KRAUS FITNESS COACHING</Text>
-        </View>
-      </Page>
-    </Document>
-  );
-  return renderToBuffer(doc);
-}
-
-export async function planToPdf(clientRow: Client, title: string, plan: PlanJson, weeks: number) {
+export async function planToPdf(
+  clientRow: Client,
+  title: string,
+  plan: PlanJson,
+  weeks: number,
+  brand: TrainerBrand
+) {
   const doc = (
     <Document>
       <Page size="LETTER" style={s.page}>
         <View style={s.header} fixed>
           <Image src={LOGO_PATH} style={s.logo} />
           <View style={s.headerText}>
-            <Text style={s.headerBrand}>CHAD KRAUS</Text>
-            <Text style={s.headerCreds}>CPT | PES | CNC | VCS</Text>
+            <Text style={s.headerBrand}>{brand.businessName.toUpperCase()}</Text>
+            {brand.credentials ? <Text style={s.headerCreds}>{brand.credentials}</Text> : null}
           </View>
         </View>
 
@@ -221,7 +107,7 @@ export async function planToPdf(clientRow: Client, title: string, plan: PlanJson
         )}
 
         <Text style={s.foot} fixed>
-          Programmed by Chad Kraus. Stop any exercise that causes pain and tell your trainer.
+          Programmed by {brand.coachName}. Stop any exercise that causes pain and tell your trainer.
         </Text>
         </View>
       </Page>
@@ -231,133 +117,45 @@ export async function planToPdf(clientRow: Client, title: string, plan: PlanJson
 }
 
 /**
- * True fillable-form version of the measurement chart, using pdf-lib
- * instead of @react-pdf/renderer. This is a genuinely different approach
- * from every other PDF in the app: @react-pdf/renderer (used everywhere
- * else) only produces flat, static PDFs — it has no concept of an
- * interactive AcroForm field. pdf-lib does, so this is the one place in
- * the codebase using it. Every field below is a real clickable/typeable
- * form field, not just a bordered box with a blank line — a client can
- * open this in any standard PDF viewer, click into a field, and type.
- * Layout here is manual (x/y coordinates, bottom-left origin) since
- * pdf-lib has no flexbox-like layout system the way react-pdf does.
+ * Body measurement chart — a designed, fillable AcroForm PDF.
+ *
+ * This deliberately does NOT lay the document out in code. An earlier
+ * version drew all 27 fields with manual pdf-lib x/y coordinate math,
+ * which meant the design lived in two places (the designer's file and
+ * ~120 lines of arithmetic) and drifted between them. Instead we ship the
+ * real designed PDF as an asset and fill it, so what the client receives
+ * is byte-for-byte the approved design.
+ *
+ * The client's name is pre-filled as a convenience; every field stays
+ * editable so they can complete it on-screen in any standard PDF viewer
+ * rather than printing it. Only field values are set — the page content
+ * is never redrawn.
  */
 export async function measurementChartToFillablePdf(clientName: string) {
-  const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+  const { PDFDocument, StandardFonts } = await import("pdf-lib");
   const fs = await import("fs/promises");
 
-  const pdfDoc = await PDFDocument.create();
+  const templateBytes = await fs.readFile(MEASUREMENT_CHART_TEMPLATE);
+  const pdfDoc = await PDFDocument.load(templateBytes);
   const form = pdfDoc.getForm();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const logoBytes = await fs.readFile(LOGO_PATH);
-  const logoImage = await pdfDoc.embedPng(logoBytes);
 
-  const PAGE_W = 612, PAGE_H = 792, MARGIN = 36;
-  const CONTENT_W = PAGE_W - MARGIN * 2;
-  const BLACK = rgb(0, 0, 0);
-  const WHITE = rgb(1, 1, 1);
-  const ORANGE = rgb(0.925, 0.42, 0.23); // #EC6B3A
-  const GREEN = rgb(0.298, 0.604, 0.165); // #4C9A2A
-  const BORDER_GRAY = rgb(0.8, 0.8, 0.8);
-  const LABEL_GRAY = rgb(0.15, 0.15, 0.15);
-  const MUTED = rgb(0.55, 0.55, 0.55);
-
-  const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
-  let fieldCounter = 0;
-
-  // Header band
-  const HEADER_H = 92;
-  page.drawRectangle({ x: 0, y: PAGE_H - HEADER_H, width: PAGE_W, height: HEADER_H, color: BLACK });
-  const logoSize = 60;
-  page.drawImage(logoImage, { x: MARGIN, y: PAGE_H - HEADER_H + (HEADER_H - logoSize) / 2, width: logoSize, height: logoSize });
-  const textX = MARGIN + logoSize + 14;
-  page.drawText("BODY MEASUREMENT CHART", { x: textX, y: PAGE_H - 34, size: 18, font: boldFont, color: WHITE });
-  page.drawText("CHAD KRAUS  |  CPT | PES | CNC | VCS", { x: textX, y: PAGE_H - 52, size: 10, font: boldFont, color: ORANGE });
-  page.drawText("Client assessment and progress tracking", { x: textX, y: PAGE_H - 66, size: 8, font, color: rgb(0.85, 0.85, 0.85) });
-  // Accent bar
-  page.drawRectangle({ x: 0, y: PAGE_H - HEADER_H - 4, width: PAGE_W, height: 4, color: GREEN });
-
-  let cursorY = PAGE_H - HEADER_H - 4 - 24;
-
-  function sectionHeader(title: string) {
-    const h = 20;
-    page.drawRectangle({ x: MARGIN, y: cursorY - h, width: CONTENT_W, height: h, color: BLACK });
-    page.drawRectangle({ x: MARGIN, y: cursorY - h, width: 4, height: h, color: ORANGE });
-    page.drawText(title, { x: MARGIN + 12, y: cursorY - h + 6, size: 9, font: boldFont, color: WHITE });
-    page.drawCircle({ x: MARGIN + CONTENT_W - 12, y: cursorY - h / 2, size: 3, color: GREEN });
-    cursorY -= h + 10;
+  // getTextField throws if the field is absent or is a different widget
+  // type. A branding refresh that reorders or renames fields shouldn't
+  // 500 the download — the blank chart is still perfectly usable, so
+  // degrade to an unfilled form and leave a breadcrumb in the logs.
+  try {
+    form.getTextField("client_name").setText(clientName);
+  } catch {
+    console.warn(
+      "measurement-chart template: no 'client_name' text field — returning an unfilled chart. " +
+        "Did public/measurement-chart-template.pdf change?"
+    );
   }
 
-  function fieldGrid(labels: (string | { label: string; value?: string })[], cols: number, rowHeight = 32) {
-    const gap = 8;
-    const fieldW = (CONTENT_W - gap * (cols - 1)) / cols;
-    const rows = Math.ceil(labels.length / cols);
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const idx = r * cols + c;
-        if (idx >= labels.length) continue;
-        const item = labels[idx];
-        const label = typeof item === "string" ? item : item.label;
-        const value = typeof item === "string" ? undefined : item.value;
-        const x = MARGIN + c * (fieldW + gap);
-        const y = cursorY - r * (rowHeight + 6);
-        page.drawRectangle({ x, y: y - rowHeight, width: fieldW, height: rowHeight, borderColor: BORDER_GRAY, borderWidth: 1 });
-        page.drawText(`${label}:`, { x: x + 6, y: y - 12, size: 8, font: boldFont, color: LABEL_GRAY });
-        const tf = form.createTextField(`field_${fieldCounter++}_${label.replace(/[^a-zA-Z0-9]/g, "_")}`);
-        if (value) tf.setText(value);
-        tf.addToPage(page, {
-          x: x + 6, y: y - rowHeight + 5, width: fieldW - 12, height: 14,
-          borderWidth: 0, font, textColor: BLACK,
-        });
-      }
-    }
-    cursorY -= rows * (rowHeight + 6) + 14;
-  }
-
-  function wideField(label: string, height = 36) {
-    page.drawRectangle({ x: MARGIN, y: cursorY - height, width: CONTENT_W, height, borderColor: BORDER_GRAY, borderWidth: 1 });
-    page.drawText(`${label}:`, { x: MARGIN + 6, y: cursorY - 12, size: 8, font: boldFont, color: LABEL_GRAY });
-    const tf = form.createTextField(`field_${fieldCounter++}_${label.replace(/[^a-zA-Z0-9]/g, "_")}`);
-    tf.addToPage(page, { x: MARGIN + 6, y: cursorY - height + 5, width: CONTENT_W - 12, height: height - 20, borderWidth: 0, font, textColor: BLACK });
-    cursorY -= height + 14;
-  }
-
-  sectionHeader("CLIENT INFORMATION");
-  fieldGrid([
-    { label: "Client name", value: clientName },
-    { label: "Date of birth" },
-    { label: "Phone / email" },
-    { label: "Assessment date" },
-    { label: "Sex" },
-    { label: "Coach", value: "Chad Kraus" },
-  ], 2);
-  wideField("Relevant medical history / considerations");
-
-  sectionHeader("BODY COMPOSITION");
-  fieldGrid(["Height", "Weight", "BMI", "Body fat %", "Lean mass", "Resting heart rate"], 3);
-
-  sectionHeader("BODY CIRCUMFERENCE");
-  fieldGrid(["Neck", "Mid upper arm", "Chest / bust", "Hip", "Waist", "Mid-thigh", "Abdomen", "Calf"], 2);
-
-  sectionHeader("SKINFOLD MEASUREMENTS");
-  fieldGrid(["Biceps", "Triceps", "Iliac crest", "Thigh", "Abdomen", "Subscapular", "Chest", "Calf"], 2);
-
-  sectionHeader("ASSESSMENT NOTES AND GOALS");
-  const notesH = 130;
-  page.drawRectangle({ x: MARGIN, y: cursorY - notesH, width: CONTENT_W, height: notesH, borderColor: BORDER_GRAY, borderWidth: 1 });
-  const notesField = form.createTextField("field_notes");
-  notesField.enableMultiline();
-  notesField.addToPage(page, { x: MARGIN + 6, y: cursorY - notesH + 6, width: CONTENT_W - 12, height: notesH - 12, borderWidth: 0, font, textColor: BLACK });
-
-  // Footer
-  page.drawText("Measurements should be taken consistently using the same method, equipment, and conditions.", {
-    x: MARGIN, y: 24, size: 7, font, color: MUTED, maxWidth: CONTENT_W * 0.6,
-  });
-  page.drawText("CHAD KRAUS FITNESS COACHING", {
-    x: PAGE_W - MARGIN - boldFont.widthOfTextAtSize("CHAD KRAUS FITNESS COACHING", 8),
-    y: 24, size: 8, font: boldFont, color: ORANGE,
-  });
+  // Without this the value is stored but renders blank in viewers that
+  // don't generate appearance streams themselves (notably Preview.app).
+  const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  form.updateFieldAppearances(helv);
 
   return pdfDoc.save();
 }

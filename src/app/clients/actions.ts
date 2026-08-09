@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { isKnownLimitationTag } from "@/lib/safety/rules";
 
 async function uid() {
   const supabase = await supabaseServer();
@@ -68,12 +69,26 @@ export async function deleteClient(form: FormData) {
 export async function addLimitation(form: FormData) {
   const { supabase, userId } = await uid();
   const clientId = String(form.get("client_id"));
-  await supabase.from("client_limitations").insert({
+  const tag = String(form.get("tag"));
+
+  // The <select> in the UI is the only thing that used to constrain this,
+  // and a client-side control is not a validation. A tag with no rule behind
+  // it silently disables filtering for that injury, so reject it at the
+  // door — the database has a matching CHECK constraint as the backstop.
+  if (!isKnownLimitationTag(tag)) {
+    throw new Error(
+      `"${tag}" is not a supported limitation type. The safety engine has no screening rule for it, so it cannot be logged.`
+    );
+  }
+
+  const { error } = await supabase.from("client_limitations").insert({
     trainer_id: userId,
     client_id: clientId,
-    tag: String(form.get("tag")),
+    tag,
     detail: String(form.get("detail") || "") || null,
   });
+  if (error) throw new Error(error.message);
+
   revalidatePath(`/clients/${clientId}`);
   revalidatePath(`/clients/new/${clientId}/limitations`);
 }

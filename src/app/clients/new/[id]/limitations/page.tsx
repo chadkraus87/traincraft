@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { LIMITATION_TAGS, LIMITATION_LABELS } from "@/lib/safety/rules";
 import { addLimitation } from "../../../actions";
 import WizardSteps from "@/components/WizardSteps";
@@ -7,6 +8,7 @@ import WizardSteps from "@/components/WizardSteps";
 export default async function OnboardingLimitations({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await supabaseServer();
+  await requireUser();
   const [{ data: client }, { data: limitations }] = await Promise.all([
     supabase.from("clients").select("full_name").eq("id", id).single(),
     supabase.from("client_limitations").select("*").eq("client_id", id).order("created_at"),

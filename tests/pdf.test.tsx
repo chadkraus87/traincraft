@@ -1,6 +1,6 @@
 /** TEST 3 · PDF renderer produces a valid, non-trivial PDF with exclusions box. */
 import { writeFileSync } from "fs";
-import { planToPdf } from "../src/lib/pdf";
+import { planToPdf, measurementChartToFillablePdf } from "../src/lib/pdf";
 import type { Client, PlanJson } from "../src/lib/types";
 
 const client: Client = {
@@ -27,11 +27,46 @@ const plan: PlanJson = {
 };
 
 async function main() {
-const buf = await planToPdf(client, "Fat Loss Block 1", plan, 4);
+const buf = await planToPdf(client, "Fat Loss Block 1", plan, 4, {
+  businessName: "Alvarez Strength",
+  coachName: "Dana Alvarez",
+  credentials: "CPT | PES",
+  isDefault: false,
+});
 writeFileSync("/tmp/test-plan.pdf", buf);
 const head = buf.subarray(0, 5).toString();
 console.log(head === "%PDF-" ? "PASS  valid PDF header" : `FAIL  header: ${head}`);
 console.log(buf.length > 2000 ? `PASS  non-trivial size (${buf.length} bytes)` : "FAIL  suspiciously small");
-process.exit(head === "%PDF-" && buf.length > 2000 ? 0 : 1);
+
+// The measurement chart is no longer laid out in code — it fills a shipped
+// AcroForm asset. That makes two new things breakable that the type system
+// can't catch: the asset going missing, and the 'client_name' field being
+// renamed by a future design refresh. The renderer deliberately degrades to
+// an unfilled chart rather than throwing, so a smoke test alone would pass
+// silently; this asserts the name actually landed in the saved document.
+const chart = await measurementChartToFillablePdf("Jordan Alvarez");
+const chartHead = Buffer.from(chart.subarray(0, 5)).toString();
+const chartOk = chartHead === "%PDF-";
+console.log(chartOk ? "PASS  measurement chart is a valid PDF" : `FAIL  chart header: ${chartHead}`);
+
+const { PDFDocument } = await import("pdf-lib");
+const reloaded = await PDFDocument.load(chart);
+const form = reloaded.getForm();
+const fieldCount = form.getFields().length;
+const filledName = form.getTextField("client_name").getText();
+
+const nameOk = filledName === "Jordan Alvarez";
+console.log(nameOk
+  ? "PASS  chart pre-fills the client name"
+  : `FAIL  client_name is ${JSON.stringify(filledName)} — template field renamed or missing?`);
+
+// Pre-filling must not flatten the form; the client still has to type into it.
+const stillFillable = fieldCount >= 20;
+console.log(stillFillable
+  ? `PASS  chart stays fillable (${fieldCount} form fields)`
+  : `FAIL  only ${fieldCount} fields left — was the form flattened?`);
+
+const allPass = head === "%PDF-" && buf.length > 2000 && chartOk && nameOk && stillFillable;
+process.exit(allPass ? 0 : 1);
 }
 main();

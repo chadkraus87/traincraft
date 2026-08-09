@@ -26,12 +26,56 @@ export async function deletePlan(form: FormData) {
 }
 
 /**
- * Persists trainer edits to the QA report (notes, dismissed concerns, and
- * the "I've reviewed this" confirmation). Confirming flips the plan to
- * "final" status so it shows correctly everywhere else in the app. This
- * only edits the *review record* — it never touches which exercises are
- * actually in the plan, so it can't be used to bypass the safety engine.
+ * Re-derives a stored plan's QA report from scratch, server-side.
+ *
+ * Every write path that touches a saved plan routes through here so the
+ * qa_report column always reflects what the validator actually says about
+ * the plan's *current* contents, evaluated against the *current* client.
+ * Limitations, equipment, and the exercise pool are re-read from the
+ * database on every call — a client whose injury was logged after the plan
+ * was generated gets caught the next time the plan is touched.
+ *
+ * Critically, the caller never supplies the checks. They used to: the QA
+ * report was accepted wholesale from the browser, which meant the record
+ * asserting "this plan is safe to send" was written by the least
+ * trustworthy party in the system.
  */
+async function deriveQaForStoredPlan(
+  supabase: Awaited<ReturnType<typeof supabaseServer>>,
+  planRow: {
+    client_id: string;
+    workout_type: string;
+    days_per_week: number;
+    is_single_workout?: boolean | null;
+  },
+  plan: PlanJson,
+  attempts: number
+): Promise<QaReport> {
+  const [{ data: limitations }, { data: equipment }, { data: pool }] = await Promise.all([
+    supabase.from("client_limitations").select("*").eq("client_id", planRow.client_id).eq("active", true),
+    supabase.from("client_equipment").select("*").eq("client_id", planRow.client_id),
+    supabase.from("exercises").select("*").eq("is_active", true),
+  ]);
+
+  const limitationTags = (limitations ?? []).map((l) => l.tag as LimitationTag);
+  const { allowed } = filterForLimitations(pool ?? [], limitationTags);
+  const ownedTypes = (equipment ?? []).map((e) => e.equipment_type);
+  const { usable } = filterForEquipment(allowed, ownedTypes);
+
+  return validatePlan(
+    plan,
+    usable,
+    limitationTags,
+    planRow.workout_type as keyof typeof WORKOUT_TYPES,
+    planRow.days_per_week,
+    attempts,
+    // Omitting this was a live bug: a one-off workout re-validated under the
+    // multi-week rules fails progression_defined (which demands the word
+    // "deload" and 80+ characters) and silently demotes a good plan to draft.
+    !!planRow.is_single_workout
+  );
+}
+
 /**
  * Logs what a client actually did for one exercise — optional, never
  * blocks anything else. This is what lets future generations reference
@@ -109,17 +153,45 @@ export async function saveAsTemplate(planId: string, name: string) {
   const { data: planRow } = await supabase.from("workout_plans").select("*").eq("id", planId).single();
   if (!planRow) throw new Error("Plan not found");
 
-  await supabase.from("plan_templates").insert({
+  // Strip the exclusions before storing. They describe why *this* client's
+  // injuries removed certain exercises — one person's medical context, which
+  // has no business travelling into a template that will be applied to
+  // someone else. Leaving them in meant Client B's printed plan could carry
+  // "excluded because of a lumbar disc injury" belonging to Client A.
+  // applyTemplate recomputes exclusions for whoever the template lands on.
+  const sourcePlan = planRow.plan as PlanJson;
+  const { exclusions: _sourceClientExclusions, ...portable } = sourcePlan;
+
+  const { error } = await supabase.from("plan_templates").insert({
     trainer_id: user.id,
     name,
     workout_type: planRow.workout_type,
     weeks: planRow.weeks,
     days_per_week: planRow.days_per_week,
-    plan: planRow.plan,
+    plan: { ...portable, exclusions: [] },
   });
+  if (error) throw new Error(error.message);
 }
 
-export async function saveQaReview(planId: string, report: QaReport) {
+/**
+ * Persists a trainer's *review* of a plan: their per-check notes, which
+ * concerns they've dismissed, and the "I've reviewed this" confirmation.
+ *
+ * The trainer's judgment is the only thing this accepts. The checks
+ * themselves — which passed, which failed, and why — are re-derived on the
+ * server from the stored plan, so a hand-crafted request cannot mark a
+ * contraindicated plan as having passed QA. Dismissing a concern is still
+ * allowed and still recorded: an experienced trainer overriding a flag is a
+ * legitimate workflow, and the audit trail should show that they made that
+ * call rather than pretending the check never failed.
+ */
+export interface QaReviewInput {
+  trainerConfirmed: boolean;
+  /** Keyed by QaCheck.name. Unknown names are ignored. */
+  annotations: Record<string, { dismissed?: boolean; addressedNote?: string }>;
+}
+
+export async function saveQaReview(planId: string, review: QaReviewInput): Promise<QaReport> {
   const supabase = await supabaseServer();
   const {
     data: { user },
@@ -128,22 +200,58 @@ export async function saveQaReview(planId: string, report: QaReport) {
 
   const { data: planRow } = await supabase
     .from("workout_plans")
-    .select("client_id")
+    .select("client_id, workout_type, days_per_week, is_single_workout, plan, qa_report")
     .eq("id", planId)
     .single();
   if (!planRow) throw new Error("Plan not found");
 
-  await supabase
+  // Attempt count belongs to the generation that produced this plan; a
+  // review doesn't re-run the builder, so carry it forward rather than
+  // resetting the audit trail to 1.
+  const priorAttempts = (planRow.qa_report as QaReport | null)?.attempts ?? 1;
+
+  const derived = await deriveQaForStoredPlan(
+    supabase,
+    planRow,
+    planRow.plan as PlanJson,
+    priorAttempts
+  );
+
+  const checks = derived.checks.map((c) => {
+    const note = review.annotations?.[c.name];
+    if (!note) return c;
+    return {
+      ...c,
+      // A passing check has nothing to dismiss; ignore the flag rather than
+      // storing a confusing "dismissed" marker against a green result.
+      dismissed: c.pass ? undefined : !!note.dismissed,
+      addressedNote: note.addressedNote?.trim() ? note.addressedNote.trim().slice(0, 500) : undefined,
+    };
+  });
+
+  const report: QaReport = {
+    passed: derived.passed,
+    checks,
+    attempts: derived.attempts,
+    trainerConfirmed: !!review.trainerConfirmed,
+    trainerConfirmedAt: review.trainerConfirmed ? new Date().toISOString() : undefined,
+  };
+
+  // A plan is deliverable when the validator cleared it OR the trainer has
+  // explicitly taken responsibility for the open flags.
+  const status = derived.passed || review.trainerConfirmed ? "final" : "draft";
+
+  const { error } = await supabase
     .from("workout_plans")
-    .update({
-      qa_report: report,
-      status: report.trainerConfirmed ? "final" : "draft",
-    })
+    .update({ qa_report: report, status })
     .eq("id", planId);
+  if (error) throw new Error(error.message);
 
   revalidatePath(`/plans/${planId}`);
   revalidatePath(`/clients/${planRow.client_id}`);
   revalidatePath("/");
+
+  return report;
 }
 
 /**
@@ -170,26 +278,14 @@ export async function saveEditedPlan(planId: string, plan: PlanJson) {
     .single();
   if (!planRow) throw new Error("Plan not found");
 
-  const [{ data: limitations }, { data: equipment }, { data: pool }] = await Promise.all([
-    supabase.from("client_limitations").select("*").eq("client_id", planRow.client_id).eq("active", true),
-    supabase.from("client_equipment").select("*").eq("client_id", planRow.client_id),
-    supabase.from("exercises").select("*").eq("is_active", true),
-  ]);
+  const priorAttempts = (planRow.qa_report as QaReport | null)?.attempts ?? 1;
+  const qa = await deriveQaForStoredPlan(supabase, planRow, plan, priorAttempts);
 
-  const limitationTags = (limitations ?? []).map((l) => l.tag as LimitationTag);
-  const { allowed } = filterForLimitations(pool ?? [], limitationTags);
-  const ownedTypes = (equipment ?? []).map((e) => e.equipment_type);
-  const { usable } = filterForEquipment(allowed, ownedTypes);
-
-  const qa = validatePlan(
-    plan,
-    usable,
-    limitationTags,
-    planRow.workout_type as keyof typeof WORKOUT_TYPES,
-    planRow.days_per_week
-  );
-
-  await supabase
+  // An edit invalidates any prior sign-off: the trainer confirmed the plan
+  // as it was, not as it now is. Dropping trainerConfirmed here is what
+  // stops "reviewed and confirmed" from silently carrying over to content
+  // nobody has looked at.
+  const { error } = await supabase
     .from("workout_plans")
     .update({
       plan,
@@ -197,6 +293,7 @@ export async function saveEditedPlan(planId: string, plan: PlanJson) {
       status: qa.passed ? "final" : "draft",
     })
     .eq("id", planId);
+  if (error) throw new Error(error.message);
 
   revalidatePath(`/plans/${planId}`);
   revalidatePath(`/clients/${planRow.client_id}`);

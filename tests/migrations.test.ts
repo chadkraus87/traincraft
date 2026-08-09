@@ -4,7 +4,15 @@
  * FKs and RLS policies compile exactly as written.
  */
 import EmbeddedPostgres from "embedded-postgres";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
+
+// These assertions used to console.log("FAIL ...") and then exit 0, so CI
+// stayed green even with RLS disabled on a public table. Count and enforce.
+let failures = 0;
+function check(ok: boolean, passMsg: string, failMsg: string) {
+  if (ok) console.log(`PASS  ${passMsg}`);
+  else { console.error(`FAIL  ${failMsg}`); failures++; }
+}
 
 async function main() {
   // createPostgresUser is only needed when running as root (Postgres
@@ -37,64 +45,70 @@ async function main() {
       language sql stable as 'select null::uuid';
   `);
 
-  const m1 = readFileSync("supabase/migrations/0001_schema.sql", "utf8");
-  const m2 = readFileSync("supabase/migrations/0002_seed_exercises.sql", "utf8");
-  const m3 = readFileSync("supabase/migrations/0003_expand_exercise_library.sql", "utf8");
-  const m4 = readFileSync("supabase/migrations/0004_add_exercise_category.sql", "utf8");
-  const m5 = readFileSync("supabase/migrations/0005_isolation_and_cardio_machines.sql", "utf8");
-  const m6 = readFileSync("supabase/migrations/0006_add_single_workout_flag.sql", "utf8");
-  const m7 = readFileSync("supabase/migrations/0007_functional_and_conditioning_batch.sql", "utf8");
-  const m8 = readFileSync("supabase/migrations/0008_ace_style_expansion.sql", "utf8");
-  const m9 = readFileSync("supabase/migrations/0009_exercise_logs.sql", "utf8");
-  const m10 = readFileSync("supabase/migrations/0010_client_notes.sql", "utf8");
-  const m11 = readFileSync("supabase/migrations/0011_plan_templates.sql", "utf8");
-  const m12 = readFileSync("supabase/migrations/0012_client_goals.sql", "utf8");
-  const m13 = readFileSync("supabase/migrations/0013_exercise_favorites.sql", "utf8");
-  const m14 = readFileSync("supabase/migrations/0014_nasm_pes_batch.sql", "utf8");
-  await client.query(m1);
-  console.log("PASS  0001_schema.sql applied");
-  await client.query(m2);
-  await client.query(m3);
-  await client.query(m4);
-  await client.query(m5);
-  await client.query(m6);
-  await client.query(m7);
-  await client.query(m8);
-  await client.query(m9);
-  await client.query(m10);
-  await client.query(m11);
-  await client.query(m12);
-  await client.query(m13);
-  await client.query(m14);
+  // Discovered from disk rather than listed by hand, so a migration added
+  // later is covered by this test automatically instead of silently skipped
+  // until someone remembers to append it here.
+  const files = readdirSync("supabase/migrations")
+    .filter((f) => /^\d{4}_.+\.sql$/.test(f))
+    .sort();
+
+  for (const f of files) {
+    try {
+      await client.query(readFileSync(`supabase/migrations/${f}`, "utf8"));
+    } catch (e) {
+      console.error(`FAIL  ${f} did not apply: ${(e as Error).message}`);
+      process.exit(1);
+    }
+  }
+  console.log(`PASS  all ${files.length} migrations applied (${files[0]} … ${files[files.length - 1]})`);
+
   const { rows } = await client.query(
     "select count(*)::int as n, count(distinct pattern)::int as patterns, count(distinct category)::int as categories from exercises"
   );
-  console.log(`PASS  0002 through 0014 applied — ${rows[0].n} exercises, ${rows[0].patterns} patterns, ${rows[0].categories} categories`);
+  console.log(`PASS  exercise library seeded — ${rows[0].n} exercises, ${rows[0].patterns} patterns, ${rows[0].categories} categories`);
 
   const uncategorized = await client.query("select name from exercises where category is null");
-  console.log(uncategorized.rows.length === 0
-    ? "PASS  every exercise has a category"
-    : `FAIL  uncategorized: ${uncategorized.rows.map((r: { name: string }) => r.name).join(", ")}`);
+  check(uncategorized.rows.length === 0,
+    "every exercise has a category",
+    `uncategorized: ${uncategorized.rows.map((r: { name: string }) => r.name).join(", ")}`);
 
   // Verify GIN indexes usable + tags well-formed (no empty strings from '{}')
   const bad = await client.query(
     "select name from exercises where '' = any(contraindication_tags) or '' = any(equipment_types)"
   );
-  console.log(bad.rows.length === 0
-    ? "PASS  no malformed array tags in seed"
-    : `FAIL  malformed tags: ${bad.rows.map((r: { name: string }) => r.name).join(", ")}`);
+  check(bad.rows.length === 0,
+    "no malformed array tags in seed",
+    `malformed tags: ${bad.rows.map((r: { name: string }) => r.name).join(", ")}`);
 
   // RLS is enabled on every app table
   const rls = await client.query(`
     select relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and relkind = 'r' and not relrowsecurity
   `);
-  console.log(rls.rows.length === 0
-    ? "PASS  RLS enabled on all public tables"
-    : `FAIL  RLS missing on: ${rls.rows.map((r: { relname: string }) => r.relname).join(", ")}`);
+  check(rls.rows.length === 0,
+    "RLS enabled on all public tables",
+    `RLS missing on: ${rls.rows.map((r: { relname: string }) => r.relname).join(", ")}`);
+
+  // RLS being *enabled* proves nothing without a policy behind it: a table
+  // with RLS on and no policy denies everything, which looks safe here but
+  // breaks the app. Assert both.
+  const policyless = await client.query(`
+    select c.relname from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r'
+      and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+  `);
+  check(policyless.rows.length === 0,
+    "every public table has at least one RLS policy",
+    `no policy on: ${policyless.rows.map((r: { relname: string }) => r.relname).join(", ")}`);
 
   await client.end();
   await pg.stop();
+
+  if (failures > 0) {
+    console.error(`\n${failures} SCHEMA CHECK FAILURE(S)`);
+    process.exit(1);
+  }
 }
 
 main().catch((e) => { console.error("FAIL ", e.message); process.exit(1); });

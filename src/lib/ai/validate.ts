@@ -7,6 +7,7 @@
 import {
   CONTRAINDICATIONS,
   WORKOUT_TYPES,
+  isKnownLimitationTag,
   type LimitationTag,
 } from "@/lib/safety/rules";
 import type { Exercise, PlanJson, QaCheck, QaReport } from "@/lib/types";
@@ -19,6 +20,7 @@ const PULL = new Set(["pull_horizontal", "pull_vertical"]);
 // display, so the trainer never sees the code-facing names.
 export const QA_CHECK_LABELS: Record<string, string> = {
   pool_membership: "Every exercise really exists in your library",
+  limitation_vocabulary: "Every logged injury is one the safety engine understands",
   contraindications: "No conflicts with logged injuries",
   session_count: "Correct number of sessions",
   movement_balance: "Balanced movement patterns for this workout type",
@@ -30,7 +32,7 @@ export const QA_CHECK_LABELS: Record<string, string> = {
 export function validatePlan(
   plan: PlanJson,
   allowedPool: Exercise[],
-  limitations: LimitationTag[],
+  limitations: readonly string[],
   workoutType: keyof typeof WORKOUT_TYPES,
   daysPerWeek: number,
   attempts = 1,
@@ -39,6 +41,20 @@ export function validatePlan(
   const checks: QaCheck[] = [];
   const poolById = new Map(allowedPool.map((e) => [e.id, e]));
   const wt = WORKOUT_TYPES[workoutType];
+
+  // 0. The client's limitations must all be tags the engine has rules for.
+  // Without this, an unrecognized tag means "nothing was excluded for that
+  // injury" — and because the contraindication check below skips unknown
+  // tags the same way, both layers would agree the plan is clean. This check
+  // exists so that failure is loud instead of invisible.
+  const unrecognized = [...new Set(limitations.filter((t) => !isKnownLimitationTag(t)))];
+  checks.push({
+    name: "limitation_vocabulary",
+    pass: unrecognized.length === 0,
+    detail: unrecognized.length
+      ? `No safety rule exists for: ${unrecognized.join(", ")}. Nothing was filtered for ${unrecognized.length > 1 ? "these limitations" : "this limitation"} — re-log it using a supported injury type before sending this plan.`
+      : "All logged limitations map to a known safety rule.",
+  });
 
   // 1. Every programmed exercise must come from the allowed pool
   const unknown: string[] = [];
@@ -60,7 +76,9 @@ export function validatePlan(
       const ex = poolById.get(b.exercise_id);
       if (!ex) continue;
       for (const tag of limitations) {
-        const rule = CONTRAINDICATIONS[tag];
+        // Unknown tags are surfaced by limitation_vocabulary above, so
+        // skipping here no longer hides anything.
+        const rule = CONTRAINDICATIONS[tag as LimitationTag];
         if (!rule) continue;
         if (
           rule.avoidPatterns.includes(ex.pattern) ||

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { LIMITATION_LABELS, filterForLimitations, filterForEquipment, type LimitationTag } from "@/lib/safety/rules";
 import DeliverButtons from "@/components/DeliverButtons";
 import DeletePlanButton from "@/components/DeletePlanButton";
@@ -11,11 +12,13 @@ import type { PlanJson, QaReport } from "@/lib/types";
 export default async function PlanView({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await supabaseServer();
+  await requireUser();
   const { data: planRow } = await supabase.from("workout_plans").select("*, clients(*)").eq("id", id).single();
   if (!planRow) notFound();
 
   const plan = planRow.plan as PlanJson;
   const qa = planRow.qa_report as QaReport | null;
+  const deliverable = planRow.status === "final" || qa?.trainerConfirmed === true;
   const client = planRow.clients;
 
   // Same safety + equipment filter the generator uses, recomputed here so
@@ -70,12 +73,24 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <DeliverButtons
-            planId={planRow.id}
-            planTitle={planRow.title}
-            clientName={client.full_name}
-            clientEmail={client.email}
-          />
+          {/* Delivery is gated on QA, matching the PDF route. Hiding the
+              buttons rather than disabling them keeps the reason visible:
+              the review panel directly below is where the trainer resolves
+              it, either by fixing the plan or by confirming they've handled
+              the flags themselves. */}
+          {deliverable ? (
+            <DeliverButtons
+              planId={planRow.id}
+              planTitle={planRow.title}
+              clientName={client.full_name}
+              clientEmail={client.email}
+            />
+          ) : (
+            <span className="text-xs text-[#F4C77A] max-w-[22rem]">
+              Sending is unavailable until this plan clears QA — review the flagged checks below and
+              confirm it&apos;s safe to send.
+            </span>
+          )}
           {!planRow.is_single_workout && <SaveTemplateButton planId={planRow.id} />}
           <DeletePlanButton planId={planRow.id} clientId={client.id} planTitle={planRow.title} />
         </div>

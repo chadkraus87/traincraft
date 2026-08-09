@@ -1,10 +1,12 @@
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { WORKOUT_TYPES } from "@/lib/safety/rules";
 import GenerateForm from "@/components/GenerateForm";
 
 export default async function NewPlan({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
   const { client } = await searchParams;
   const supabase = await supabaseServer();
+  await requireUser();
   const { data: clients } = await supabase.from("clients").select("id, full_name").order("full_name");
   const { data: templates } = await supabase.from("plan_templates").select("id, name").order("name");
   const workoutTypes = Object.entries(WORKOUT_TYPES).map(([key, v]) => ({ key, label: v.label }));

@@ -17,6 +17,7 @@ import {
   type Exclusion,
 } from "@/lib/safety/rules";
 import type { Client, EquipmentItem, Exercise, PlanJson } from "@/lib/types";
+import { GeneratedPlanSchema } from "@/lib/ai/plan-schema";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -44,7 +45,21 @@ export async function buildWorkout(input: BuildInput): Promise<BuildOutput> {
   const { client, limitations, equipment, pool, workoutType } = input;
 
   // 1. Deterministic safety + equipment gates (never delegated to the LLM)
-  const { allowed, excluded } = filterForLimitations(pool, limitations);
+  const { allowed, excluded, unrecognized } = filterForLimitations(pool, limitations);
+
+  // Refuse to generate at all when a logged limitation has no rule behind
+  // it. We cannot filter for an injury we don't have a definition of, and
+  // producing a plan anyway would hand the trainer something that looks
+  // fully screened but isn't. Better to stop with an actionable message than
+  // to ship a confidently unsafe plan.
+  if (unrecognized.length > 0) {
+    throw new Error(
+      `This client has ${unrecognized.length > 1 ? "limitations" : "a limitation"} the safety engine doesn't recognize: ${unrecognized.join(", ")}. ` +
+        `No exercises can be screened against ${unrecognized.length > 1 ? "them" : "it"}, so generation is blocked. ` +
+        `Re-log the limitation using one of the supported injury types on the client's page.`
+    );
+  }
+
   const ownedTypes = equipment.map((e) => e.equipment_type);
   const { usable } = filterForEquipment(allowed, ownedTypes);
 
@@ -171,9 +186,9 @@ ${poolLines}`;
       ? text.trim()
       : text.slice(firstBrace, lastBrace + 1);
 
-  let parsed: Omit<PlanJson, "exclusions">;
+  let raw: unknown;
   try {
-    parsed = JSON.parse(clean) as Omit<PlanJson, "exclusions">;
+    raw = JSON.parse(clean);
   } catch {
     console.error("Failed to parse Claude's response as JSON. Raw output:\n", text);
     throw new Error(
@@ -182,6 +197,22 @@ ${poolLines}`;
         : "Claude's response wasn't valid JSON. Please try generating again."
     );
   }
+
+  // Parsing as JSON is not the same as being a plan. Validate the structure
+  // before anything downstream trusts the numbers in it — a string "3" in a
+  // sets field silently breaks every volume calculation in the QA validator.
+  const result = GeneratedPlanSchema.safeParse(raw);
+  if (!result.success) {
+    const detail = result.error.issues
+      .slice(0, 3)
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
+    console.error("Claude returned a structurally invalid plan:", detail, "\nRaw output:\n", text);
+    throw new Error(
+      `The generated plan came back malformed (${detail}). Please try generating again.`
+    );
+  }
+  const parsed = result.data;
 
   return {
     plan: {

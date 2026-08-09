@@ -20,10 +20,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
   const buffer = await measurementChartToFillablePdf(client.full_name);
+
+  // full_name is free text. Interpolating it raw broke header quoting for
+  // any client with a quote in their name, and a name containing CRLF made
+  // undici reject the header outright — a 500 on that one client's chart.
+  // ASCII-safe fallback for the legacy filename, plus RFC 5987 filename*
+  // so names with accents still arrive intact in modern browsers.
+  const safeAscii = client.full_name.replace(/[^a-z0-9 -]/gi, "").trim() || "Client";
+  const utf8Name = encodeURIComponent(`${client.full_name} - Measurement Chart.pdf`);
+
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${client.full_name} - Measurement Chart.pdf"`,
+      "Content-Disposition":
+        `attachment; filename="${safeAscii} - Measurement Chart.pdf"; filename*=UTF-8''${utf8Name}`,
     },
   });
 }

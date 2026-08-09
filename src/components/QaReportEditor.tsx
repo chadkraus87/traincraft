@@ -27,9 +27,20 @@ export default function QaReportEditor({ planId, initialQa }: { planId: string; 
   const save = async () => {
     setSaving(true);
     setSavedMsg(null);
-    const updated = { ...qa, trainerConfirmed: confirmed };
-    await saveQaReview(planId, updated);
-    setQa(updated);
+
+    // Send only the trainer's own judgment — notes, dismissals, and the
+    // confirmation. The pass/fail verdicts are recomputed on the server from
+    // the stored plan and returned to us; posting them from here would let
+    // the browser assert that a plan cleared safety checks it never ran.
+    const annotations = Object.fromEntries(
+      qa.checks
+        .filter((c) => c.dismissed || c.addressedNote)
+        .map((c) => [c.name, { dismissed: c.dismissed, addressedNote: c.addressedNote }])
+    );
+
+    const saved = await saveQaReview(planId, { trainerConfirmed: confirmed, annotations });
+    setQa(saved);
+    setConfirmed(!!saved.trainerConfirmed);
     setSaving(false);
     setSavedMsg("Saved.");
     router.refresh();

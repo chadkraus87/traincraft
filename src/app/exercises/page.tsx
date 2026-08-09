@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { EXERCISE_CATEGORIES } from "@/lib/safety/rules";
 import { addCustomExercise } from "./actions";
 import MuscleDiagram from "@/components/MuscleDiagram";
@@ -47,6 +48,7 @@ export default async function ExercisesPage({
 }) {
   const { q, pattern, category, favorites } = await searchParams;
   const supabase = await supabaseServer();
+  await requireUser();
   const { data: { user } } = await supabase.auth.getUser();
 
   const [queryResult, favoritesResult] = await Promise.all([

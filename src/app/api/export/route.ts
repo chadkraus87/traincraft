@@ -55,7 +55,7 @@ export async function GET() {
     deliveries: deliveries.data ?? [],
   };
 
-  const filename = `traincraft-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const filename = `coachrhythm-backup-${new Date().toISOString().slice(0, 10)}.json`;
   return new NextResponse(JSON.stringify(backup, null, 2), {
     headers: {
       "Content-Type": "application/json",

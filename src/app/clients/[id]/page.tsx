@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { LIMITATION_TAGS, LIMITATION_LABELS, EQUIPMENT_TYPES, equipmentLabel, filterForLimitations, type LimitationTag } from "@/lib/safety/rules";
 import { addLimitation, toggleLimitation, addEquipment, removeEquipment, addClientNote, addGoal, toggleGoalComplete, deleteGoal } from "../actions";
 import ClientEditPanel from "@/components/ClientEditPanel";
@@ -13,6 +14,7 @@ import type { PlanJson } from "@/lib/types";
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await supabaseServer();
+  await requireUser();
   const [{ data: client }, { data: limitations }, { data: equipment }, { data: plans }, { data: logs }, { data: notes }, { data: allExercises }, { data: goals }] =
     await Promise.all([
       supabase.from("clients").select("*").eq("id", id).single(),

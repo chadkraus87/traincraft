@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import { addClient } from "./actions";
 
 export default async function ClientsPage() {
   const supabase = await supabaseServer();
+  await requireUser();
   const { data: clients } = await supabase.from("clients").select("*").order("full_name");
 
   return (

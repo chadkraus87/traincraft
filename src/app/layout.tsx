@@ -4,10 +4,11 @@ import "./globals.css";
 import { supabaseServer } from "@/lib/supabase/server";
 import SignOutButton from "@/components/SignOutButton";
 import { Dumbbell } from "lucide-react";
+import { PRODUCT } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "TrainCraft",
-  description: "Client management and safe AI workout programming for personal trainers",
+  title: PRODUCT.name,
+  description: PRODUCT.tagline,
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <div className="mx-auto max-w-5xl px-5 py-4 flex items-center justify-between">
             <Link href="/" className="display text-xl font-extrabold flex items-center gap-2">
               <Dumbbell className="text-coral" size={20} aria-hidden="true" />
-              Train<span className="text-terracotta">Craft</span>
+              Coach<span className="text-terracotta">Rhythm</span>
             </Link>
             <nav className="flex gap-6 text-sm items-center">
               {user ? (
@@ -38,6 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/exercises" className="hover:text-terracotta">Exercise library</Link>
                   <Link href="/plans/new" className="hover:text-terracotta">New plan</Link>
                   <Link href="/workouts/new" className="hover:text-terracotta">New workout</Link>
+                  <Link href="/settings" className="hover:text-terracotta">Settings</Link>
                   <SignOutButton />
                 </>
               ) : (

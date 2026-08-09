@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
 import type { PlanJson } from "@/lib/types";
 
 function uniqueExerciseNames(plan: PlanJson): Set<string> {
@@ -20,6 +21,8 @@ export default async function ComparePlans({
   if (!a || !b) notFound();
 
   const supabase = await supabaseServer();
+
+  await requireUser();
   const [{ data: planA }, { data: planB }] = await Promise.all([
     supabase.from("workout_plans").select("id,title,status,created_at,plan").eq("id", a).single(),
     supabase.from("workout_plans").select("id,title,status,created_at,plan").eq("id", b).single(),

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 export default function Login() {
@@ -16,7 +17,14 @@ export default function Login() {
     const supabase = supabaseBrowser();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setErr(error.message); setBusy(false); return; }
-    window.location.href = "/";
+
+    // Return the trainer to whatever they were trying to reach. Only
+    // same-origin absolute paths are honoured — a "next" of "//evil.test" or
+    // "https://evil.test" is discarded rather than followed, so the redirect
+    // can't be turned into a phishing hop.
+    const next = new URLSearchParams(window.location.search).get("next");
+    const safe = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    window.location.href = safe;
   };
 
   return (
@@ -54,6 +62,10 @@ export default function Login() {
           {busy ? "Please wait…" : "Sign in"}
         </button>
       </form>
+      <p className="text-sm text-steel mt-4">
+        New here?{" "}
+        <Link href="/signup" className="underline hover:text-coral">Create an account</Link>
+      </p>
     </div>
   );
 }

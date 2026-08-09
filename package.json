@@ -1,5 +1,5 @@
 {
-  "name": "traincraft",
+  "name": "coachrhythm",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "tsx tests/safety.test.ts && tsx tests/pdf.test.tsx && tsx tests/builder-guard.test.ts",
-    "test:db": "tsx tests/migrations.test.ts",
+    "test:db": "tsx tests/migrations.test.ts && tsx tests/rls.test.ts && tsx tests/coverage.test.ts",
     "test:e2e": "playwright test",
     "check:migrations": "tsx tests/check-migrations-complete.ts"
   },
