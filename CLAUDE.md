@@ -29,7 +29,7 @@ only one.
   `src/lib/` — Supabase clients, Claude API calls, domain logic.
 - `src/middleware.ts` — auth/session handling. Touch carefully; it runs on every
   request.
-- `supabase/migrations/` — 14 versioned migrations. **Never edit an applied
+- `supabase/migrations/` — 20 versioned migrations. **Never edit an applied
   migration; add a new one.** `npm run check:migrations` guards this.
 - **Plan generation (synchronous today):** `POST /api/generate`
   (`src/app/api/generate/route.ts`) runs the full pipeline in a single HTTP
