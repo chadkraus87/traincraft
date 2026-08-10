@@ -22,7 +22,10 @@ const MEASUREMENT_CHART_TEMPLATE = path.join(
 
 const s = StyleSheet.create({
   page: { padding: 0, fontSize: 10, fontFamily: "Helvetica", color: "#16211B" },
-  body: { padding: 36 },
+  // paddingBottom reserves room for the fixed footer. A `fixed` absolutely
+  // positioned element doesn't occupy layout space, so without this the last
+  // rows of a full session table flow underneath the disclaimer.
+  body: { paddingTop: 36, paddingHorizontal: 36, paddingBottom: 92 },
   header: { backgroundColor: "#000000", paddingVertical: 16, paddingHorizontal: 36, flexDirection: "row", alignItems: "center", gap: 14 },
   logo: { width: 54, height: 54 },
   headerText: { color: "#F7F0E6" },
@@ -39,9 +42,15 @@ const s = StyleSheet.create({
   box: { marginTop: 16, padding: 10, backgroundColor: "#FBF3E1", borderLeftWidth: 3, borderLeftColor: "#E0A63C" },
   boxTitle: { fontFamily: "Helvetica-Bold", marginBottom: 4 },
   prog: { marginTop: 16, padding: 10, backgroundColor: "#F0F4F1" },
-  // Bottom margin raised from 20 to fit the two-line disclaimer without it
-  // colliding with the page edge on a full session table.
-  foot: { position: "absolute", bottom: 14, left: 36, right: 36, fontSize: 6.5, color: "#999", lineHeight: 1.4 },
+  // Footer is a stack rather than one paragraph. Three distinct things are
+  // being said — who wrote this, what to do if it hurts, and what this
+  // document is not — and running them together made the safety instruction
+  // read as fine print, which is exactly the sentence that needs to be read.
+  footWrap: { position: "absolute", bottom: 16, left: 36, right: 36, borderTopWidth: 0.5, borderTopColor: "#DDD", paddingTop: 5 },
+  footBy: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#5C6660" },
+  footSafety: { fontSize: 7, color: "#5C6660", marginTop: 2.5, lineHeight: 1.35 },
+  footLegal: { fontSize: 6.5, color: "#AAA", marginTop: 2.5, lineHeight: 1.3 },
+  footProduct: { fontSize: 6, color: "#BBB", marginTop: 2 },
 });
 
 export async function planToPdf(
@@ -116,17 +125,24 @@ export async function planToPdf(
             the attribution line establishes that a named professional
             prescribed this and that the software drafted it, which is both
             true and the correct allocation of responsibility. */}
-        <Text style={s.foot} fixed>
-          Programmed by {brand.coachName}
-          {brand.credentials ? `, ${brand.credentials}` : ""}
-          {brand.phone ? ` · ${brand.phone}` : ""}. Prepared for you individually and reviewed by
-          your trainer. Discontinue any exercise that causes pain and let{" "}
-          {brand.coachName.split(" ")[0]} know so it can be adjusted. This program is general
-          fitness guidance, not medical advice — if you have a medical condition or a new injury,
-          get clearance from a qualified healthcare professional before continuing.
-          {"\n"}
-          Drafted with {PRODUCT.name}. Exercise selection is your trainer&apos;s responsibility.
-        </Text>
+        <View style={s.footWrap} fixed>
+          <Text style={s.footBy}>
+            Programmed by {brand.coachName}
+            {brand.credentials ? `, ${brand.credentials}` : ""}
+            {brand.phone ? `  ·  ${brand.phone}` : ""}
+          </Text>
+          <Text style={s.footSafety}>
+            Prepared for you individually and reviewed by your trainer. Discontinue any exercise
+            that causes pain and let {brand.coachName.split(" ")[0]} know so it can be adjusted.
+          </Text>
+          <Text style={s.footLegal}>
+            General fitness guidance, not medical advice. If you have a medical condition or a new
+            injury, get clearance from a qualified healthcare professional before continuing.
+          </Text>
+          <Text style={s.footProduct}>
+            Drafted with {PRODUCT.name} · Exercise selection is your trainer&apos;s responsibility.
+          </Text>
+        </View>
         </View>
       </Page>
     </Document>
