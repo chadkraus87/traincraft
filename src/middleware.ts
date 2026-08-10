@@ -49,6 +49,16 @@ export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
   if (!user && !isPublic(pathname)) {
+    // API callers get an honest status code, not a redirect to an HTML page.
+    // Redirecting them means a fetch() whose session expired mid-session
+    // receives 200 OK with a login page in the body, and the UI tries to
+    // JSON.parse it — surfacing as a nonsense parse error instead of "you're
+    // signed out". The route handlers all return 401 themselves; this is so
+    // they actually get the chance to.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+    }
+
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = "";

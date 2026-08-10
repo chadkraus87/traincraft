@@ -135,6 +135,11 @@ async function main() {
     { tag: "hypertension_uncontrolled", family: "yoga strength poses", match: /warrior|chair pose/i },
     { tag: "low_back_pain", family: "carries and sleds", match: /carry|sled/i },
     { tag: "lumbar_disc_injury", family: "hinge patterning", match: /bridge|hip hinge|glute/i },
+    // Direction of loading is the variable that matters in osteoporosis:
+    // flexion-biased work raises vertebral fracture risk, extensor
+    // strengthening lowers it. The ruleset avoids core_flexion correctly; if
+    // extension disappears too, nothing is left in either direction.
+    { tag: "osteoporosis", family: "spinal extensor work", match: /back extension|cobra|bird dog|swimming/i },
   ];
   for (const { tag, family, match } of MUST_SURVIVE) {
     const { allowed } = filterForLimitations(pool, [tag]);

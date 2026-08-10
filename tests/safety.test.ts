@@ -9,6 +9,7 @@ import {
   filterForEquipment,
 } from "../src/lib/safety/rules";
 import { validatePlan } from "../src/lib/ai/validate";
+import { isDeliverable } from "../src/lib/ai/plan-qa";
 import type { Exercise, PlanJson } from "../src/lib/types";
 
 let failures = 0;
@@ -276,6 +277,32 @@ const goodPlan: PlanJson = {
   const qa = validatePlan(single, pool, [], "full_body_strength", 1, 1, true);
   check("a short single workout clears volume sanity",
     qa.checks.find((c) => c.name === "volume_sanity")!.pass);
+}
+
+// ── Delivery gate: a plan must not stay sendable after the client changes ─
+{
+  const clean = validatePlan(goodPlan, pool, [], "full_body_strength", 3);
+  check("a passing plan is deliverable", isDeliverable(clean, clean));
+}
+{
+  // Generated clean, then the trainer logs an injury that contraindicates
+  // something in it. The stored report still says "passed"; the live one
+  // doesn't. Sending must stop until that's resolved.
+  const stored = validatePlan(goodPlan, pool, [], "full_body_strength", 3);
+  const restricted = pool.filter((e) => e.name !== "Push-Up");
+  const live = validatePlan(goodPlan, restricted, [], "full_body_strength", 3);
+  check("a plan stops being deliverable once a check newly fails",
+    stored.passed && !isDeliverable(stored, live));
+}
+{
+  // A trainer who reviewed the open flags and signed off keeps the ability
+  // to send — the override is a legitimate workflow, not a bug.
+  const p = structuredClone(goodPlan);
+  p.progression_notes = "add weight";
+  const failing = validatePlan(p, pool, [], "full_body_strength", 3);
+  const signedOff = { ...failing, trainerConfirmed: true };
+  check("a trainer-confirmed plan stays deliverable despite an open flag",
+    !failing.passed && isDeliverable(signedOff, failing));
 }
 
 console.log(failures === 0 ? "\nALL UNIT TESTS PASSED" : `\n${failures} FAILURES`);
