@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx tests/safety.test.ts && tsx tests/pdf.test.tsx && tsx tests/builder-guard.test.ts",
+    "test": "tsx tests/safety.test.ts && tsx tests/pdf.test.tsx && tsx tests/builder-guard.test.ts && tsx tests/observability.test.ts",
     "test:db": "tsx tests/migrations.test.ts && tsx tests/rls.test.ts && tsx tests/coverage.test.ts",
     "test:e2e": "playwright test",
     "check:migrations": "tsx tests/check-migrations-complete.ts"
@@ -15,6 +15,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@react-pdf/renderer": "^4.1.5",
+    "@sentry/nextjs": "^10.69.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.0",
     "lucide-react": "^1.26.0",

@@ -30,6 +30,8 @@ const CSP = [
   "upgrade-insecure-requests",
 ].join("; ");
 
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
@@ -53,4 +55,31 @@ const nextConfig = {
     ];
   },
 };
-export default nextConfig;
+/**
+ * Source maps are only uploaded when a Sentry auth token is present.
+ *
+ * Without this guard a contributor — or CI — building without Sentry
+ * credentials gets a failed build for a monitoring feature they aren't
+ * using. Errors still report fine without uploaded maps; the stack traces
+ * are just minified.
+ */
+const sentryEnabled = !!process.env.SENTRY_AUTH_TOKEN;
+
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  // Sentry's build plugin phones home with anonymous usage stats by default.
+  telemetry: false,
+  sourcemaps: {
+    disable: !sentryEnabled,
+    // Uploaded maps are deleted from the deployed output afterwards, so the
+    // app's source isn't served publicly alongside it.
+    deleteSourcemapsAfterUpload: true,
+  },
+  // Routes browser error reports through our own domain, so an ad blocker
+  // doesn't silently swallow the errors we most need to see.
+  tunnelRoute: "/monitoring",
+  disableLogger: true,
+});

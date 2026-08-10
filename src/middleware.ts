@@ -8,7 +8,16 @@ import { NextResponse, type NextRequest } from "next/server";
  * protected by default, and forgetting to register it fails closed (an
  * unnecessary login prompt) rather than open (an unauthenticated page).
  */
-const PUBLIC_PATHS = ["/login", "/signup", "/auth/callback"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/signup",
+  "/auth/callback",
+  // Sentry's browser tunnel. Error reports POST here from pages that may
+  // already have a broken session — gating it would mean the errors most
+  // worth seeing are the ones that never arrive. It accepts only Sentry
+  // envelopes and returns no application data.
+  "/monitoring",
+];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
