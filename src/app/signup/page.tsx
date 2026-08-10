@@ -24,7 +24,17 @@ export default function SignUp() {
     });
 
     if (error) {
-      setErr(error.message);
+      // Signups can be switched off at the Supabase project level, which is
+      // how this runs before launch. Supabase reports that as a raw
+      // "Signups not allowed for this instance" — accurate but alarming for
+      // someone who just wanted an account. Say something a human would.
+      const closed =
+        error.code === "signup_disabled" || /signups? not allowed/i.test(error.message);
+      setErr(
+        closed
+          ? `${PRODUCT.name} isn't open for new accounts just yet. Leave your email with us and we'll let you know the moment it is.`
+          : error.message
+      );
       setBusy(false);
       return;
     }
