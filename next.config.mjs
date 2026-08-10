@@ -81,5 +81,9 @@ export default withSentryConfig(nextConfig, {
   // Routes browser error reports through our own domain, so an ad blocker
   // doesn't silently swallow the errors we most need to see.
   tunnelRoute: "/monitoring",
-  disableLogger: true,
+  webpack: {
+    // Strips Sentry's own debug logging from the production bundle.
+    // Replaces the deprecated top-level `disableLogger`.
+    treeshake: { removeDebugLogging: true },
+  },
 });
