@@ -51,8 +51,22 @@ export default function ClientEditPanel({ client }: { client: Client }) {
         <input name="phone" defaultValue={client.phone ?? ""} className="input" placeholder="(512) 555-0100" /></div>
       <div><span className="label">Goals</span>
         <input name="goals" defaultValue={client.goals ?? ""} className="input" /></div>
-      <div><span className="label">Training history / notes</span>
-        <textarea name="training_history" defaultValue={client.training_history ?? ""} rows={3} className="input" /></div>
+      <div><span className="label">Training background</span>
+        <textarea
+          name="training_history"
+          defaultValue={client.training_history ?? ""}
+          rows={3}
+          className="input"
+          placeholder="Lifting experience, sports background, what they enjoy or avoid"
+        />
+        {/* Renamed from "Training history / notes". The old label invited
+            medical narrative into a free-text column; this one asks for
+            training background, which is what the generator actually uses. */}
+        <p className="text-xs text-steel mt-1">
+          Training background only — log injuries as limitations below, and keep diagnoses and
+          medications out.
+        </p>
+      </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="is_remote" defaultChecked={client.is_remote} /> Remote client (home equipment only)
       </label>

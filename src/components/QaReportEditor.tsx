@@ -127,7 +127,13 @@ export default function QaReportEditor({ planId, initialQa }: { planId: string; 
       <div className="flex items-center gap-3 pt-2 border-t border-steel/10 mt-2">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-          I've reviewed this and confirm it's safe to send
+          {/* Worded as an attestation rather than an acknowledgement. The
+              automated checks are a drafting aid; the professional judgment
+              that this plan suits this client is the trainer's, and the
+              record should say what they actually attested to. This text is
+              stored with a timestamp in the plan's QA report. */}
+          I&apos;ve reviewed this plan against what I know about this client, and I&apos;m
+          professionally satisfied it&apos;s appropriate and safe for them to perform
         </label>
         <button type="button" className="btn" onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save review"}

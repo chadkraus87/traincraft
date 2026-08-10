@@ -39,7 +39,9 @@ const s = StyleSheet.create({
   box: { marginTop: 16, padding: 10, backgroundColor: "#FBF3E1", borderLeftWidth: 3, borderLeftColor: "#E0A63C" },
   boxTitle: { fontFamily: "Helvetica-Bold", marginBottom: 4 },
   prog: { marginTop: 16, padding: 10, backgroundColor: "#F0F4F1" },
-  foot: { position: "absolute", bottom: 20, left: 36, right: 36, fontSize: 7, color: "#999" },
+  // Bottom margin raised from 20 to fit the two-line disclaimer without it
+  // colliding with the page edge on a full session table.
+  foot: { position: "absolute", bottom: 14, left: 36, right: 36, fontSize: 6.5, color: "#999", lineHeight: 1.4 },
 });
 
 export async function planToPdf(
@@ -106,16 +108,24 @@ export async function planToPdf(
           </View>
         )}
 
-        {/* The safety line is the last thing a client reads and the only
-            place the plan speaks directly to them, so it's worth getting
-            right. "Stop any exercise that causes pain and tell your trainer"
-            reads like a warning label; this frames the same instruction as
-            normal coaching practice, which is what actually gets followed. */}
+        {/* The plan is the only artifact that reaches the client, so it is
+            the only place a disclaimer actually lands in front of the person
+            who could be injured. Two jobs, deliberately separated:
+            the safety instruction speaks to the client in coaching language,
+            because a warning that reads like a legal notice gets skipped;
+            the attribution line establishes that a named professional
+            prescribed this and that the software drafted it, which is both
+            true and the correct allocation of responsibility. */}
         <Text style={s.foot} fixed>
           Programmed by {brand.coachName}
-          {brand.phone ? ` · ${brand.phone}` : ""}. This program was prepared for you individually.
-          Discontinue any exercise that causes pain and let {brand.coachName.split(" ")[0]} know, so
-          it can be adjusted.
+          {brand.credentials ? `, ${brand.credentials}` : ""}
+          {brand.phone ? ` · ${brand.phone}` : ""}. Prepared for you individually and reviewed by
+          your trainer. Discontinue any exercise that causes pain and let{" "}
+          {brand.coachName.split(" ")[0]} know so it can be adjusted. This program is general
+          fitness guidance, not medical advice — if you have a medical condition or a new injury,
+          get clearance from a qualified healthcare professional before continuing.
+          {"\n"}
+          Drafted with {PRODUCT.name}. Exercise selection is your trainer&apos;s responsibility.
         </Text>
         </View>
       </Page>

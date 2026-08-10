@@ -11,6 +11,7 @@ import SendMeasurementChartButton from "@/components/SendMeasurementChartButton"
 import PlanCompareSelector from "@/components/PlanCompareSelector";
 import DeleteLimitationButton from "@/components/DeleteLimitationButton";
 import type { PlanJson } from "@/lib/types";
+import { PRODUCT } from "@/lib/brand";
 
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -196,7 +197,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="font-medium">{LIMITATION_LABELS[l.tag as keyof typeof LIMITATION_LABELS] ?? l.tag}</p>
-                    {l.detail && <p className="text-xs text-steel">{l.detail}</p>}
+                    {l.side && <p className="text-xs text-steel capitalize">{l.side} side</p>}
                   </div>
                   {/* Two different actions on purpose. "Mark resolved" keeps
                       the history for an injury that healed — that belongs on
@@ -229,7 +230,21 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                 <option key={t} value={t}>{LIMITATION_LABELS[t]}</option>
               ))}
             </select>
-            <input name="detail" className="input" placeholder="Context (e.g. left side, flares with overhead work)" />
+            <select name="side" className="input" defaultValue="">
+              <option value="">Side — not applicable</option>
+              <option value="left">Left side</option>
+              <option value="right">Right side</option>
+              <option value="bilateral">Both sides</option>
+            </select>
+            {/* This replaced a free-text "context" box. A field shaped like
+                that collects diagnoses, medications and surgery dates — the
+                most sensitive data this app could hold, and nothing read it.
+                The screening rule comes from the tag alone. */}
+            <p className="text-xs text-steel">
+              Screening is driven by the limitation type above. Keep clinical details — diagnoses,
+              medications, imaging — out of {PRODUCT.name}; they aren&apos;t used, and this isn&apos;t
+              a medical record.
+            </p>
             <button className="btn-ghost w-full justify-center">Log limitation</button>
           </form>
         </div>
@@ -301,7 +316,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
         <h2 className="display text-lg mb-3">Notes</h2>
         <form action={addClientNote} className="flex gap-2 mb-3">
           <input type="hidden" name="client_id" value={client.id} />
-          <input name="note" className="input" placeholder="Anything worth remembering — sleep, nutrition, how they're feeling…" />
+          <input name="note" className="input" placeholder="Coaching notes — sleep, energy, technique cues, what to push next time" />
           <button className="btn-ghost shrink-0">Add note</button>
         </form>
         {(notes ?? []).length === 0 && <p className="text-sm text-steel">No notes yet.</p>}

@@ -101,11 +101,19 @@ export async function addLimitation(form: FormData) {
     );
   }
 
+  // `side` replaced a free-text "context" box. Constrained on purpose: the
+  // old field collected clinical narrative — diagnoses, medications, surgery
+  // dates — that nothing in the app ever read, in exchange for holding the
+  // most sensitive category of data in the schema. Anything outside the
+  // three accepted values is discarded rather than stored.
+  const rawSide = String(form.get("side") || "");
+  const side = ["left", "right", "bilateral"].includes(rawSide) ? rawSide : null;
+
   const { error } = await supabase.from("client_limitations").insert({
     trainer_id: userId,
     client_id: clientId,
     tag,
-    detail: String(form.get("detail") || "") || null,
+    side,
   });
   if (error) throw new Error(error.message);
 
