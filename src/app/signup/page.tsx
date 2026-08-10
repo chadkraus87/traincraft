@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import TurnstileWidget, { turnstileEnabled } from "@/components/TurnstileWidget";
 import { PRODUCT } from "@/lib/brand";
 
 export default function SignUp() {
@@ -11,6 +12,8 @@ export default function SignUp() {
   const [err, setErr] = useState<string | null>(null);
   const [checkEmail, setCheckEmail] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +23,10 @@ export default function SignUp() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        ...(captchaToken ? { captchaToken } : {}),
+      },
     });
 
     if (error) {
@@ -35,6 +41,8 @@ export default function SignUp() {
           ? `${PRODUCT.name} isn't open for new accounts just yet. Leave your email with us and we'll let you know the moment it is.`
           : error.message
       );
+      // Single-use token — without a reset the retry fails on a stale one.
+      setCaptchaReset((n) => n + 1);
       setBusy(false);
       return;
     }
@@ -113,11 +121,12 @@ export default function SignUp() {
             You&apos;ll be storing client health information — use a password you don&apos;t reuse.
           </p>
         </div>
+        <TurnstileWidget onToken={setCaptchaToken} resetSignal={captchaReset} />
         {err && <p className="text-sm text-alarm">{err}</p>}
         <button
           type="submit"
           className="btn w-full justify-center"
-          disabled={!email || password.length < 8 || busy}
+          disabled={!email || password.length < 8 || busy || (turnstileEnabled && !captchaToken)}
         >
           {busy ? "Creating account…" : "Create account"}
         </button>

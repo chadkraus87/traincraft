@@ -17,12 +17,18 @@
  */
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  // challenges.cloudflare.com is Turnstile. Without it the CAPTCHA script is
+  // blocked outright, the widget never renders, no token is produced, and
+  // Supabase rejects every sign-in — a lockout caused by the CSP rather than
+  // by anything the user did.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
   // Supabase is reached directly from the browser for auth and queries.
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  // Turnstile renders its challenge inside an iframe from this origin.
+  "frame-src https://challenges.cloudflare.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

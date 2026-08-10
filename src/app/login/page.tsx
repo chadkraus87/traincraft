@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import TurnstileWidget, { turnstileEnabled } from "@/components/TurnstileWidget";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -9,14 +10,31 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setBusy(true);
     const supabase = supabaseBrowser();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setErr(error.message); setBusy(false); return; }
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      // Only sent when a site key is configured. Supabase rejects auth
+      // requests without a token whenever project-level CAPTCHA is on, so
+      // these two settings have to be turned on together.
+      ...(captchaToken ? { options: { captchaToken } } : {}),
+    });
+    if (error) {
+      setErr(error.message);
+      // Turnstile tokens are single-use. Without this reset the next attempt
+      // fails on a stale token, and a simple typo'd password starts
+      // reporting itself as a CAPTCHA failure.
+      setCaptchaReset((n) => n + 1);
+      setBusy(false);
+      return;
+    }
 
     // Return the trainer to whatever they were trying to reach. Only
     // same-origin absolute paths are honoured — a "next" of "//evil.test" or
@@ -57,8 +75,13 @@ export default function Login() {
             </button>
           </div>
         </div>
+        <TurnstileWidget onToken={setCaptchaToken} resetSignal={captchaReset} />
         {err && <p className="text-sm text-alarm">{err}</p>}
-        <button type="submit" className="btn w-full justify-center" disabled={!email || password.length < 6 || busy}>
+        <button
+          type="submit"
+          className="btn w-full justify-center"
+          disabled={!email || password.length < 6 || busy || (turnstileEnabled && !captchaToken)}
+        >
           {busy ? "Please wait…" : "Sign in"}
         </button>
       </form>
