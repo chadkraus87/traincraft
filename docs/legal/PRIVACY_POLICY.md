@@ -7,13 +7,18 @@
 > licensed attorney. It must be reviewed and approved by a licensed attorney in
 > the relevant jurisdiction before publication.
 >
-> **Two statements in this draft are not yet true of the software and must not
-> be published until they are:**
-> 1. § 5.2 states that no direct identifiers are sent to our AI provider. As of
->    this draft, `src/lib/ai/builder.ts:143` sends the client's full name. Fix
->    the code, then publish the sentence.
-> 2. § 9 describes account deletion. As of this draft, no account-deletion
->    capability exists in the application. Build it, then publish the section.
+> **One statement in this draft is not yet true of the software and must not be
+> published until it is:**
+> - § 9 describes trainer account deletion. As of this draft, no
+>   account-deletion or tenant-purge capability exists in the application.
+>   Build it, then publish the section.
+>
+> **Resolved during drafting:** § 5.2 states that the client's name is not sent
+> to our AI provider. That was *not* true when this analysis began — the name
+> was transmitted on every generation — and was corrected in commit `57d361c`
+> while these documents were being prepared. The statement is now accurate.
+> Add a regression assertion to `tests/builder-guard.test.ts` so it stays that
+> way.
 >
 > Statements about our AI provider's retention and training practices (§ 5.2,
 > § 6) must be verified in writing against that vendor's current terms before
@@ -47,8 +52,10 @@ straightforward about it:
   your injury is.
 - **We do not sell your information. We do not share it for advertising. We do
   not use it to train AI models.** Not ours, not anyone's.
-- **We run no analytics, no advertising trackers, and no third-party scripts.**
-  The only cookies we set are the ones that keep a trainer logged in.
+- **We run no analytics and no advertising trackers.** The only cookies we set
+  are the ones that keep a trainer logged in. We use one error-monitoring tool
+  to find crashes, deliberately configured so that it never receives names,
+  injuries, notes, or any other information about you (§ 6).
 
 The rest of this policy is the detail.
 
@@ -171,8 +178,10 @@ financial account details beyond what our payment processor holds; browsing
 activity outside our Service; or information from data brokers or advertising
 networks.
 
-**We run no analytics platform, no advertising pixels, no session recording, no
-heatmapping, and no third-party scripts of any kind.**
+**We run no analytics platform, no advertising pixels, no heatmapping, and no
+session recording.** We deliberately do not enable session replay in our
+error-monitoring tool, because it would record a trainer's screen — including
+client names and injuries — and send it to a third party.
 
 ---
 
@@ -214,8 +223,7 @@ client's recorded limitations. This runs before anything is sent anywhere.
 - **the client's injury and limitation tags.** Because filtering happens first,
   the AI is never told what the client's injury is. It only receives a list of
   exercises that are already safe for them;
-- **the client's name** *(see the draft notice at the top of this document — this
-  must be true in the code before this line is published)*;
+- **the client's name.** No direct identifier is transmitted;
 - the client's email address, phone number, or body measurements;
 - any trainer billing information.
 
@@ -263,7 +271,23 @@ process only on our instructions:
 | **Supabase** | Database, authentication, hosting | All stored trainer and client data | United States (US-East) |
 | **Vercel** | Application hosting and delivery | Data in transit; request logs | United States |
 | **Anthropic** | AI plan generation | The prompt contents listed in § 5.2 | United States |
+| **Sentry** | Error monitoring | **Crash diagnostics only** — stack traces, route, environment. Configured to receive **no** names, injuries, notes, request bodies, headers, cookies, IP addresses, or user identifiers. See below | United States |
 | **[Stripe]** | Payment processing | Trainer billing information only — **no client data** | United States |
+
+**About error monitoring, specifically.** We use Sentry to find crashes. An
+error tracker that is not carefully configured is one of the most common ways
+health information leaks to a third party — the default settings on most such
+tools send request bodies, headers, cookies, and IP addresses, which is exactly
+how a client's name and diagnosis end up on someone else's dashboard. We have
+configured ours the other way round: request bodies, headers, and cookies are
+discarded outright, no user identifier is attached, IP collection is off,
+console breadcrumbs are dropped, values under sensitive field names are
+replaced before transmission, anything resembling an email address is scrubbed
+from error text, and **session replay is disabled**. Error reports are routed
+through our own domain rather than directly to a third-party host. **This
+redaction is verified by an automated test suite**, because a regression in it
+would be invisible in the product and discoverable only by reading someone
+else's error dashboard.
 
 The current list is maintained at [SUBPROCESSOR PAGE URL]. **We will give
 trainers at least 30 days' notice before adding a new subprocessor** that
@@ -502,6 +526,8 @@ impressively.
 - **Rate limiting** on plan generation, to prevent abuse and cost exhaustion.
 - **Least-privilege vendor access**, and a short subprocessor list.
 - **Input validation** on all API boundaries.
+- **Error monitoring configured to exclude personal and health information**,
+  with the redaction verified by automated tests (§ 6).
 
 **What we do not have, stated honestly:**
 
@@ -526,9 +552,11 @@ Use a strong, unique one. Report suspected compromise to [SECURITY EMAIL].
 trainer logged in and protect against cross-site request forgery.
 
 **We do not use analytics cookies, advertising cookies, or any third-party
-tracking technology.** There is nothing to consent to and no preference centre,
-because there is nothing optional to set. If that ever changes, we will update
-this policy and provide controls before deploying anything.
+tracking technology.** Our error-monitoring tool sets no cookies, does not
+track you across sites, and sends its reports through our own domain rather
+than to a third-party host. There is nothing to consent to and no preference
+centre, because there is nothing optional to set. If that ever changes, we will
+update this policy and provide controls before deploying anything.
 
 We do not respond to Global Privacy Control or Do Not Track signals, because we
 do not engage in the sale, sharing, or targeted advertising that those signals

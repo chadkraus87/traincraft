@@ -81,6 +81,13 @@ async function main() {
   await admin.query(`
     create schema auth;
     create table auth.users (id uuid primary key);
+    -- Supabase provisions these roles; the embedded Postgres used for tests
+    -- does not, so migrations that grant to them would fail here for a
+    -- reason that has nothing to do with the migration.
+    do $do$ begin
+      if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+      if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+    end $do$;
     create or replace function auth.uid() returns uuid
       language sql stable as
       $$ select nullif(current_setting('request.jwt.claims.sub', true), '')::uuid $$;
@@ -97,6 +104,11 @@ async function main() {
     create role app_user nologin;
     grant usage on schema public to app_user;
     grant select, insert, update, delete on all tables in schema public to app_user;
+    -- Supabase runs a signed-in request as the "authenticated" role, so the
+    -- test principal has to inherit it or grants written against it aren't
+    -- being exercised at all. Without this, delete_own_account would appear
+    -- to be correctly locked down when in fact it was untested.
+    grant authenticated to app_user;
   `);
 
   const db = pg.getPgClient("coachrhythm");
@@ -226,10 +238,45 @@ async function main() {
     "trainer A could not delete their own custom exercise (missing DELETE policy)"
   );
 
+  // ── delete_own_account: a SECURITY DEFINER function, so prove its blast
+  //    radius. It runs with the definer's privileges and can write to
+  //    auth.users, which is exactly the kind of function that becomes a
+  //    cross-tenant hole if it ever takes its target from an argument.
+  await actAs(db, TRAINER_B);
+  await db.query("select public.delete_own_account()");
+
+  // Verified through the admin connection: app_user deliberately has no
+  // USAGE on the auth schema, which is itself the correct posture — the only
+  // thing that may touch auth.users is the definer function.
+  const bGone = await admin.query("select id from auth.users where id = $1", [TRAINER_B]);
+  check(bGone.rows.length === 0, "delete_own_account removes the caller's auth user", "trainer B's account survived deletion");
+
+  const aSurvives = await admin.query("select id from auth.users where id = $1", [TRAINER_A]);
+  check(aSurvives.rows.length === 1,
+    "deleting one account leaves the other trainer untouched",
+    "deleting trainer B's account also removed trainer A");
+
+  // The cascade is the whole point — a deletion that leaves health data
+  // behind is not a deletion.
+  await actAs(db, TRAINER_A);
+  const aStillHasData = await db.query("select id from clients");
+  check(aStillHasData.rows.length === 1, "trainer A's clients survive B's deletion", "B's deletion took A's data with it");
+
+  const orphaned = await admin.query(
+    "select count(*)::int as n from clients where trainer_id = $1", [TRAINER_B]
+  );
+  check(orphaned.rows[0].n === 0,
+    "the deleted trainer's clients cascade away with them",
+    `${orphaned.rows[0].n} of trainer B's clients survived — health data outliving the account`);
+
   // ── Signed out: no session, no data ───────────────────────────────────
   await db.query("select set_config('request.jwt.claims.sub', '', false)");
   const anon = await db.query("select id from clients");
   check(anon.rows.length === 0, "an anonymous session reads no client rows", "anonymous session could read client data");
+
+  const anonDelete = await rejects(db, "select public.delete_own_account()");
+  check(anonDelete, "delete_own_account refuses an unauthenticated caller",
+    "delete_own_account ran without a session — it should raise, not silently match no rows");
 
   await db.end();
   await admin.end();

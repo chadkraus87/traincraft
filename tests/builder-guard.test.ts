@@ -1,6 +1,34 @@
-/** TEST 4 · Builder refuses degenerate pools before any API call. */
-import { buildWorkout } from "../src/lib/ai/builder";
+/** TEST 4 · Builder refuses degenerate pools, and never names the client. */
+import { buildWorkout, clientBrief } from "../src/lib/ai/builder";
 import type { Client, Exercise } from "../src/lib/types";
+
+// ── The client's name must not reach the model ──────────────────────────
+// A name reads like helpful context to anyone improving prompt quality, so
+// without this assertion the removal silently reverts. Everything else about
+// the person is still sent — goals, training history, injuries — so what
+// leaves is health data about an unnamed individual rather than a named one.
+{
+  const named: Client = {
+    id: "c1", full_name: "Marguerite Vasquez-Oyelaran", email: "m@example.com",
+    phone: "555-0100", goals: "Fat loss", training_history: "Novice", is_remote: true,
+  };
+  const brief = clientBrief(named);
+  const leaks = ["Marguerite", "Vasquez-Oyelaran", "m@example.com", "555-0100"]
+    .filter((needle) => brief.includes(needle));
+
+  if (leaks.length > 0) {
+    console.log(`FAIL  client identifiers reached the prompt: ${leaks.join(", ")}`);
+    process.exit(1);
+  }
+  console.log("PASS  the client is never named or contactable in the prompt");
+
+  // The brief still has to be useful, or we've removed the wrong thing.
+  const informative = brief.includes("Fat loss") && brief.includes("Novice");
+  console.log(informative
+    ? "PASS  programming context survives the redaction"
+    : "FAIL  the brief lost the context the model needs");
+  if (!informative) process.exit(1);
+}
 
 const client: Client = { id: "c", full_name: "T", email: null, phone: null, goals: null, training_history: null, is_remote: true };
 const tinyPool: Exercise[] = [{

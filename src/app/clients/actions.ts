@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { isKnownLimitationTag } from "@/lib/safety/rules";
+import type { PlanJson } from "@/lib/types";
 
 /**
  * Awaits a Supabase write and throws if it failed.
@@ -136,9 +137,52 @@ export async function toggleLimitation(form: FormData) {
 export async function deleteLimitation(form: FormData) {
   const { supabase } = await uid();
   const clientId = String(form.get("client_id"));
-  await must(
-    supabase.from("client_limitations").delete().eq("id", String(form.get("id")))
-  );
+  const limitationId = String(form.get("id"));
+
+  // Read the tag before deleting — it's the key to the copies below.
+  const { data: limitation } = await supabase
+    .from("client_limitations")
+    .select("tag")
+    .eq("id", limitationId)
+    .single();
+
+  await must(supabase.from("client_limitations").delete().eq("id", limitationId));
+
+  // Deleting the row is not the same as deleting the information.
+  //
+  // Every plan generated while this limitation was active carries a copy of
+  // it inside plan.exclusions — the exercise that was removed, the tag, and
+  // the clinical rationale. That is the same health claim about the same
+  // person, written into a second table that no foreign key cascades from.
+  // A trainer who deletes a mis-logged "lumbar disc injury" would reasonably
+  // believe it was gone, and it would still be sitting in the JSON of every
+  // past plan, and printed on the PDF their client receives.
+  //
+  // So the delete reaches the copies. Scoped to this client's plans and to
+  // this tag, so unrelated exclusions are untouched.
+  if (limitation?.tag) {
+    const { data: plans } = await supabase
+      .from("workout_plans")
+      .select("id, plan")
+      .eq("client_id", clientId);
+
+    for (const row of plans ?? []) {
+      const plan = row.plan as PlanJson;
+      const remaining = (plan.exclusions ?? []).filter(
+        (e) => e.limitation_tag !== limitation.tag
+      );
+      if (remaining.length === (plan.exclusions ?? []).length) continue;
+
+      await must(
+        supabase
+          .from("workout_plans")
+          .update({ plan: { ...plan, exclusions: remaining } })
+          .eq("id", row.id)
+      );
+      revalidatePath(`/plans/${row.id}`);
+    }
+  }
+
   revalidatePath(`/clients/${clientId}`);
   // Any plan built while this limitation was active is now evaluated against
   // a different client picture, so drop cached plan pages too.

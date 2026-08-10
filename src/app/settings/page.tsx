@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { PRODUCT } from "@/lib/brand";
 import TrainerProfileForm from "@/components/TrainerProfileForm";
+import DeleteAccountPanel from "@/components/DeleteAccountPanel";
 
 export default async function Settings({
   searchParams,
@@ -39,6 +40,10 @@ export default async function Settings({
 
         <TrainerProfileForm profile={profile ?? null} showSkip={!!welcome} />
       </div>
+
+      {/* Hidden during first-run onboarding — offering account deletion to
+          someone who just signed up is noise at best. */}
+      {!welcome && <DeleteAccountPanel email={user.email ?? "your account"} />}
     </div>
   );
 }

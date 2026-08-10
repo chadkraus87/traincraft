@@ -46,3 +46,28 @@ export async function saveTrainerProfile(form: FormData): Promise<SaveResult> {
   revalidatePath("/settings");
   return { ok: true, message: "Branding saved." };
 }
+
+/**
+ * Deletes the trainer's account and everything in it.
+ *
+ * The heavy lifting is a database function rather than a cascade of deletes
+ * here: one statement against auth.users, and every foreign key in the
+ * schema cascades from it. Doing it in application code would mean
+ * maintaining a list of tables that silently goes stale the next time one is
+ * added — and the table someone forgets is the one holding health data.
+ *
+ * Signing out afterwards is not cosmetic. The user record is gone but the
+ * browser still holds a JWT that stays syntactically valid until it expires,
+ * and every request it makes would resolve to a trainer who no longer exists.
+ */
+export async function deleteOwnAccount(): Promise<{ ok: boolean; message: string }> {
+  const supabase = await supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const { error } = await supabase.rpc("delete_own_account");
+  if (error) return { ok: false, message: error.message };
+
+  await supabase.auth.signOut();
+  return { ok: true, message: "Account deleted." };
+}

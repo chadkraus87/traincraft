@@ -41,6 +41,29 @@ export interface BuildOutput {
   exclusions: Exclusion[];
 }
 
+/**
+ * The client section of the prompt — everything about the person that the
+ * model is told.
+ *
+ * Extracted and exported so it can be asserted directly. The client's name
+ * is deliberately absent: it served no programming purpose (the model writes
+ * the same plan either way) and it was the only directly identifying field
+ * leaving our infrastructure for a third-party API, attached to that
+ * person's injuries and training history. Sending health information about
+ * an unnamed individual is a materially different disclosure from sending it
+ * about a named one.
+ *
+ * This is easy to undo by accident — a name reads like helpful context when
+ * someone is improving prompt quality — so tests/builder-guard.test.ts
+ * asserts it stays out.
+ */
+export function clientBrief(client: Client): string {
+  return `CLIENT
+Goals: ${client.goals ?? "General fitness"}
+Training history: ${client.training_history ?? "Unknown — assume novice"}
+Remote: ${client.is_remote ? "yes — home equipment only" : "no"}`;
+}
+
 export async function buildWorkout(input: BuildInput): Promise<BuildOutput> {
   const { client, limitations, equipment, pool, workoutType } = input;
 
@@ -139,18 +162,7 @@ Program ONE template week (${input.daysPerWeek} sessions); progression_notes exp
 
   const fullSystem = system + (input.isSingleWorkout ? singleWorkoutOutput : multiWeekOutput);
 
-  // The client's name is deliberately NOT sent. It served no programming
-  // purpose — the model writes the same plan either way — and it was the one
-  // piece of directly identifying information leaving our infrastructure for
-  // a third-party API, attached to that person's injuries and training
-  // history. Removing it means what we send is health information about an
-  // unnamed individual rather than about a named one, which is a materially
-  // different disclosure. The trainer's own copy is unaffected; the name is
-  // added back locally when the PDF is rendered.
-  const user = `CLIENT
-Goals: ${client.goals ?? "General fitness"}
-Training history: ${client.training_history ?? "Unknown — assume novice"}
-Remote: ${client.is_remote ? "yes — home equipment only" : "no"}
+  const user = `${clientBrief(client)}
 
 AVAILABLE EQUIPMENT
 ${equipLines}
