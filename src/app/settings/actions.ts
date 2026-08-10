@@ -10,7 +10,12 @@ import { supabaseServer } from "@/lib/supabase/server";
  * WITH CHECK would reject that anyway; this just means we never depend on
  * the policy to catch a bug we could have avoided outright.)
  */
-export async function saveTrainerProfile(form: FormData) {
+export interface SaveResult {
+  ok: boolean;
+  message: string;
+}
+
+export async function saveTrainerProfile(form: FormData): Promise<SaveResult> {
   const supabase = await supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not signed in");
@@ -29,10 +34,15 @@ export async function saveTrainerProfile(form: FormData) {
       business_name: clean("business_name"),
       coach_name: clean("coach_name"),
       credentials: clean("credentials"),
+      phone: clean("phone"),
     },
     { onConflict: "trainer_id" }
   );
-  if (error) throw new Error(error.message);
+  // Returned rather than thrown so the form can show the failure in place.
+  // An unhandled server-action throw in production renders a generic error
+  // screen and loses whatever the trainer had typed.
+  if (error) return { ok: false, message: error.message };
 
   revalidatePath("/settings");
+  return { ok: true, message: "Branding saved." };
 }

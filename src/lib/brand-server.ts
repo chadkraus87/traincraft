@@ -23,7 +23,7 @@ export async function getTrainerBrand(trainerId: string): Promise<TrainerBrand> 
   const supabase = await supabaseServer();
   const { data } = await supabase
     .from("trainer_profiles")
-    .select("business_name, coach_name, credentials")
+    .select("business_name, coach_name, credentials, phone")
     .eq("trainer_id", trainerId)
     .maybeSingle();
 

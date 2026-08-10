@@ -31,6 +31,7 @@ const buf = await planToPdf(client, "Fat Loss Block 1", plan, 4, {
   businessName: "Alvarez Strength",
   coachName: "Dana Alvarez",
   credentials: "CPT | PES",
+  phone: "(512) 555-0142",
   isDefault: false,
 });
 writeFileSync("/tmp/test-plan.pdf", buf);

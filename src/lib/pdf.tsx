@@ -106,8 +106,16 @@ export async function planToPdf(
           </View>
         )}
 
+        {/* The safety line is the last thing a client reads and the only
+            place the plan speaks directly to them, so it's worth getting
+            right. "Stop any exercise that causes pain and tell your trainer"
+            reads like a warning label; this frames the same instruction as
+            normal coaching practice, which is what actually gets followed. */}
         <Text style={s.foot} fixed>
-          Programmed by {brand.coachName}. Stop any exercise that causes pain and tell your trainer.
+          Programmed by {brand.coachName}
+          {brand.phone ? ` · ${brand.phone}` : ""}. This program was prepared for you individually.
+          Discontinue any exercise that causes pain and let {brand.coachName.split(" ")[0]} know, so
+          it can be adjusted.
         </Text>
         </View>
       </Page>

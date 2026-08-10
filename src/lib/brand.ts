@@ -27,6 +27,7 @@ export interface TrainerProfileRow {
   business_name: string | null;
   coach_name: string | null;
   credentials: string | null;
+  phone: string | null;
 }
 
 export interface TrainerBrand {
@@ -37,6 +38,9 @@ export interface TrainerBrand {
   /** e.g. "CPT | PES | CNC | VCS". Empty string when unset — callers must
    *  treat it as optional and skip rendering the line entirely. */
   credentials: string;
+  /** Business contact number. Empty string when unset — callers must skip
+   *  rendering it rather than printing a bare separator. */
+  phone: string;
   /** True when the trainer has set nothing, so PDFs are showing product
    *  branding as a stand-in. Lets the UI nudge them to fill it in. */
   isDefault: boolean;
@@ -46,6 +50,7 @@ export function resolveTrainerBrand(profile: TrainerProfileRow | null | undefine
   const business = profile?.business_name?.trim() || "";
   const coach = profile?.coach_name?.trim() || "";
   const creds = profile?.credentials?.trim() || "";
+  const phone = profile?.phone?.trim() || "";
 
   return {
     businessName: business || PRODUCT.name,
@@ -53,6 +58,7 @@ export function resolveTrainerBrand(profile: TrainerProfileRow | null | undefine
     // by-line sensible for a trainer who filled in only one of the two.
     coachName: coach || business || PRODUCT.name,
     credentials: creds,
-    isDefault: !business && !coach && !creds,
+    phone,
+    isDefault: !business && !coach && !creds && !phone,
   };
 }

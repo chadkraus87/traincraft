@@ -210,6 +210,10 @@ export async function POST(req: Request) {
         plan,
         qa_report: qa,
         is_single_workout: !!isSingleWorkout,
+        // Recorded so the plan can be re-validated against the same pool it
+        // was built from. This equipment is intentionally never written to
+        // the client's inventory, so the plan row is the only place it exists.
+        extra_equipment_types: extraEquipmentTypes ?? [],
       })
       .select("id")
       .single();

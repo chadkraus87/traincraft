@@ -164,7 +164,7 @@ export async function saveQaReview(planId: string, review: QaReviewInput): Promi
 
   const { data: planRow } = await supabase
     .from("workout_plans")
-    .select("client_id, workout_type, days_per_week, is_single_workout, plan, qa_report")
+    .select("client_id, workout_type, days_per_week, is_single_workout, extra_equipment_types, plan, qa_report")
     .eq("id", planId)
     .single();
   if (!planRow) throw new Error("Plan not found");

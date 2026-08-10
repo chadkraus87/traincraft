@@ -24,6 +24,13 @@ export interface StoredPlanRow {
   workout_type: string;
   days_per_week: number;
   is_single_workout?: boolean | null;
+  /**
+   * Ad-hoc equipment the plan was generated with, which was never saved to
+   * the client. Replayed here so re-validation asks the same question the
+   * generator asked. Without it, any plan built using the "consider
+   * additional equipment" toggle fails pool_membership forever.
+   */
+  extra_equipment_types?: string[] | null;
 }
 
 export async function deriveQaForStoredPlan(
@@ -40,7 +47,10 @@ export async function deriveQaForStoredPlan(
 
   const limitationTags = (limitations ?? []).map((l) => l.tag as string);
   const { allowed } = filterForLimitations(pool ?? [], limitationTags);
-  const ownedTypes = (equipment ?? []).map((e) => e.equipment_type);
+  const ownedTypes = [
+    ...(equipment ?? []).map((e) => e.equipment_type),
+    ...(planRow.extra_equipment_types ?? []),
+  ];
   const { usable } = filterForEquipment(allowed, ownedTypes);
 
   return validatePlan(

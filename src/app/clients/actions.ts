@@ -123,6 +123,28 @@ export async function toggleLimitation(form: FormData) {
   revalidatePath(`/clients/${clientId}`);
 }
 
+/**
+ * Permanently removes a limitation, for one logged in error.
+ *
+ * Distinct from "Mark resolved", which is the right action for an injury
+ * that healed — that keeps the history, and the client's record should show
+ * that they once had a lumbar disc injury. This is for the case where the
+ * entry is simply wrong: a mis-click, or the wrong client. Keeping a
+ * mistaken injury on someone's record isn't caution, it's an inaccurate
+ * medical note that will keep narrowing their programming forever.
+ */
+export async function deleteLimitation(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  await must(
+    supabase.from("client_limitations").delete().eq("id", String(form.get("id")))
+  );
+  revalidatePath(`/clients/${clientId}`);
+  // Any plan built while this limitation was active is now evaluated against
+  // a different client picture, so drop cached plan pages too.
+  revalidatePath("/");
+}
+
 export async function addEquipment(form: FormData) {
   const { supabase, userId } = await uid();
   const clientId = String(form.get("client_id"));

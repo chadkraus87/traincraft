@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { PRODUCT } from "@/lib/brand";
-import { saveTrainerProfile } from "./actions";
+import TrainerProfileForm from "@/components/TrainerProfileForm";
 
 export default async function Settings({
   searchParams,
@@ -16,7 +15,7 @@ export default async function Settings({
 
   const { data: profile } = await supabase
     .from("trainer_profiles")
-    .select("business_name, coach_name, credentials")
+    .select("business_name, coach_name, credentials, phone")
     .eq("trainer_id", user.id)
     .maybeSingle();
 
@@ -38,57 +37,7 @@ export default async function Settings({
           This is what your clients see on the PDFs you send them.
         </p>
 
-        <form action={saveTrainerProfile} className="space-y-4">
-          <div>
-            <label className="label" htmlFor="business_name">Business name</label>
-            <input
-              id="business_name"
-              name="business_name"
-              className="input"
-              defaultValue={profile?.business_name ?? ""}
-              placeholder="e.g. Alvarez Strength & Conditioning"
-              maxLength={120}
-            />
-            <p className="text-xs text-steel mt-1">Appears in the header of every plan PDF.</p>
-          </div>
-
-          <div>
-            <label className="label" htmlFor="coach_name">Your name</label>
-            <input
-              id="coach_name"
-              name="coach_name"
-              className="input"
-              defaultValue={profile?.coach_name ?? ""}
-              placeholder="e.g. Dana Alvarez"
-              maxLength={120}
-            />
-            <p className="text-xs text-steel mt-1">
-              Used for the &ldquo;Programmed by …&rdquo; line at the foot of a plan.
-            </p>
-          </div>
-
-          <div>
-            <label className="label" htmlFor="credentials">Credentials</label>
-            <input
-              id="credentials"
-              name="credentials"
-              className="input"
-              defaultValue={profile?.credentials ?? ""}
-              placeholder="e.g. CPT | PES | CNC"
-              maxLength={120}
-            />
-            <p className="text-xs text-steel mt-1">
-              Optional. Leave blank and the line is omitted entirely rather than left empty.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button type="submit" className="btn">Save</button>
-            {welcome && (
-              <Link href="/clients/new" className="btn-ghost">Skip — add my first client</Link>
-            )}
-          </div>
-        </form>
+        <TrainerProfileForm profile={profile ?? null} showSkip={!!welcome} />
       </div>
     </div>
   );

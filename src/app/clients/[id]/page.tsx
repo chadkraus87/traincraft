@@ -9,6 +9,7 @@ import NoteRow from "@/components/NoteRow";
 import NotesAndLogsSearch from "@/components/NotesAndLogsSearch";
 import SendMeasurementChartButton from "@/components/SendMeasurementChartButton";
 import PlanCompareSelector from "@/components/PlanCompareSelector";
+import DeleteLimitationButton from "@/components/DeleteLimitationButton";
 import type { PlanJson } from "@/lib/types";
 
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -197,14 +198,26 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                     <p className="font-medium">{LIMITATION_LABELS[l.tag as keyof typeof LIMITATION_LABELS] ?? l.tag}</p>
                     {l.detail && <p className="text-xs text-steel">{l.detail}</p>}
                   </div>
-                  <form action={toggleLimitation}>
-                    <input type="hidden" name="id" value={l.id} />
-                    <input type="hidden" name="client_id" value={client.id} />
-                    <input type="hidden" name="active" value={String(!l.active)} />
-                    <button className="text-xs underline text-steel hover:text-coral">
-                      {l.active ? "Mark resolved" : "Reactivate"}
-                    </button>
-                  </form>
+                  {/* Two different actions on purpose. "Mark resolved" keeps
+                      the history for an injury that healed — that belongs on
+                      the record. "Delete" is for one logged by mistake, which
+                      would otherwise narrow this client's programming forever
+                      on the strength of a mis-click. */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <form action={toggleLimitation}>
+                      <input type="hidden" name="id" value={l.id} />
+                      <input type="hidden" name="client_id" value={client.id} />
+                      <input type="hidden" name="active" value={String(!l.active)} />
+                      <button className="text-xs underline text-steel hover:text-coral">
+                        {l.active ? "Mark resolved" : "Reactivate"}
+                      </button>
+                    </form>
+                    <DeleteLimitationButton
+                      limitationId={l.id}
+                      clientId={client.id}
+                      label={LIMITATION_LABELS[l.tag as keyof typeof LIMITATION_LABELS] ?? l.tag}
+                    />
+                  </div>
                 </div>
               </li>
             ))}
