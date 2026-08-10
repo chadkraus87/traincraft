@@ -139,8 +139,15 @@ Program ONE template week (${input.daysPerWeek} sessions); progression_notes exp
 
   const fullSystem = system + (input.isSingleWorkout ? singleWorkoutOutput : multiWeekOutput);
 
+  // The client's name is deliberately NOT sent. It served no programming
+  // purpose — the model writes the same plan either way — and it was the one
+  // piece of directly identifying information leaving our infrastructure for
+  // a third-party API, attached to that person's injuries and training
+  // history. Removing it means what we send is health information about an
+  // unnamed individual rather than about a named one, which is a materially
+  // different disclosure. The trainer's own copy is unaffected; the name is
+  // added back locally when the PDF is rendered.
   const user = `CLIENT
-Name: ${client.full_name}
 Goals: ${client.goals ?? "General fitness"}
 Training history: ${client.training_history ?? "Unknown — assume novice"}
 Remote: ${client.is_remote ? "yes — home equipment only" : "no"}
