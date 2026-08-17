@@ -84,7 +84,7 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient, tem
           </select>
           {templateId && (
             <p className="text-xs text-steel mt-1">
-              Applies instantly, no AI call — the template's exercises are re-checked against this client's actual limitations and equipment. Anything unsafe for them gets flagged for review, same as any other plan.
+              Applies instantly, no AI call — the template&apos;s exercises are re-checked against this client&apos;s actual limitations and equipment. Anything unsafe for them gets flagged for review, same as any other plan.
             </p>
           )}
         </div>

@@ -176,7 +176,11 @@ export async function POST(req: Request) {
 
   try {
     // Attempt 1
-    let { plan, allowedPool } = await buildWorkout(input);
+    // Split rather than destructured: `plan` is reassigned if the retry
+    // wins, `allowedPool` never is.
+    const attempt = await buildWorkout(input);
+    const allowedPool = attempt.allowedPool;
+    let plan = attempt.plan;
     let qa = validatePlan(plan, allowedPool, limitationTags, workoutType, daysPerWeek, 1, !!isSingleWorkout);
 
     // One retry with failure feedback folded into trainer notes
