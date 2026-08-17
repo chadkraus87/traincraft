@@ -188,7 +188,7 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
       {(deliveries ?? []).length > 0 && (
         <div className="card">
           <h2 className="display text-lg mb-2">Delivery history</h2>
-          <p className="text-xs text-steel mb-2">Trainer-confirmed — the app can't automatically detect whether an email actually sent.</p>
+          <p className="text-xs text-steel mb-2">Trainer-confirmed — the app can&apos;t automatically detect whether an email actually sent.</p>
           <ul className="text-sm space-y-1">
             {(deliveries ?? []).map((d) => (
               <li key={d.id} className="text-steel">

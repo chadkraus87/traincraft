@@ -75,7 +75,7 @@ export default async function Dashboard({
     <div className="space-y-8">
       {welcome === "1" && (
         <div className="border-l-4 border-coral bg-coral/10 text-coral px-4 py-3 rounded-r-md text-sm">
-          Account created — you're all set.
+          Account created — you&apos;re all set.
         </div>
       )}
 

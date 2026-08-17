@@ -18,7 +18,7 @@ export default async function OnboardingLimitations({ params }: { params: Promis
     <div className="max-w-xl mx-auto">
       <h1 className="display text-3xl mb-2">{client?.full_name} — limitations</h1>
       <WizardSteps current={2} />
-      <p className="text-sm text-steel mb-4">Any injuries or limitations to program around? Skip this if there aren't any yet — you can always add them later.</p>
+      <p className="text-sm text-steel mb-4">Any injuries or limitations to program around? Skip this if there aren&apos;t any yet — you can always add them later.</p>
 
       <div className="card">
         {(limitations ?? []).length > 0 && (

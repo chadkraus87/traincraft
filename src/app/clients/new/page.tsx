@@ -1,6 +1,7 @@
 import { createClientForOnboarding } from "../actions";
 import WizardSteps from "@/components/WizardSteps";
 import { requireUser } from "@/lib/auth";
+import Link from "next/link";
 
 export default async function NewClientWizardStart() {
   await requireUser();
@@ -9,7 +10,7 @@ export default async function NewClientWizardStart() {
       <h1 className="display text-3xl mb-2">Add a client — guided setup</h1>
       <WizardSteps current={1} />
       <p className="text-sm text-steel mb-4">
-        A short walkthrough: basics, then limitations, then equipment, then straight into building their first plan. Prefer to just add someone quickly? <a href="/clients" className="text-coral underline">Use the quick-add form instead.</a>
+        A short walkthrough: basics, then limitations, then equipment, then straight into building their first plan. Prefer to just add someone quickly? <Link href="/clients" className="text-coral underline">Use the quick-add form instead.</Link>
       </p>
       <form action={createClientForOnboarding} className="card space-y-3">
         <div><span className="label">Full name</span><input name="full_name" required className="input" /></div>

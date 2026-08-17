@@ -94,7 +94,7 @@ export default function QaReportEditor({ planId, initialQa }: { planId: string; 
         {active.length === 0
           ? "No open automatic concerns."
           : `${active.length} of ${qa.checks.length} automatic checks didn't pass.`}
-        {" "}Add notes, dismiss concerns you've handled another way, and confirm below when you're satisfied it's safe to send.
+        {" "}Add notes, dismiss concerns you&apos;ve handled another way, and confirm below when you&apos;re satisfied it&apos;s safe to send.
       </p>
 
       {active.length > 0 && <ul className="mb-2">{active.map((c) => renderCheck(c, "fail"))}</ul>}
