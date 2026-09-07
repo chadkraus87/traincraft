@@ -22,3 +22,6 @@ npm-debug.log*
 next-env.d.ts
 .aider*
 docs/legal/ANALYSIS.md
+
+# claude code — personal permissions stay local; shared config is committed
+.claude/settings.local.json
