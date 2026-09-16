@@ -5,6 +5,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { isKnownLimitationTag } from "@/lib/safety/rules";
 import type { PlanJson } from "@/lib/types";
 import { MEASUREMENT_FIELDS, CHECKIN_FIELDS } from "@/lib/progress";
+import { ALLERGENS, DIETS } from "@/lib/nutrition/gates";
+import { ACTIVITY_LEVELS, GOALS } from "@/lib/nutrition/macros";
 
 /**
  * Awaits a Supabase write and throws if it failed.
@@ -440,4 +442,38 @@ export async function addCheckin(form: FormData) {
     })
   );
   revalidatePath(`/clients/${clientId}/progress`);
+}
+
+export async function saveNutritionProfile(form: FormData) {
+  const { supabase, userId } = await uid();
+  const clientId = String(form.get("client_id"));
+  const pick = <T extends string>(key: string, allowed: readonly T[]): T => {
+    const v = String(form.get(key));
+    if (!(allowed as readonly string[]).includes(v)) throw new Error(`Choose a valid ${key.replace("_", " ")}.`);
+    return v as T;
+  };
+  const allergens = form.getAll("allergens").map(String);
+  if (allergens.some((a) => !(ALLERGENS as readonly string[]).includes(a))) throw new Error("Unrecognised allergen.");
+  await must(
+    supabase.from("nutrition_profiles").upsert({
+      client_id: clientId,
+      trainer_id: userId,
+      activity_level: pick("activity_level", Object.keys(ACTIVITY_LEVELS)),
+      goal: pick("goal", Object.keys(GOALS)),
+      diet: pick("diet", DIETS),
+      allergens,
+      gluten_free: form.get("gluten_free") === "on",
+      other_allergy: form.get("other_allergy") === "on",
+      severe_allergy: form.get("severe_allergy") === "on",
+    })
+  );
+  revalidatePath(`/clients/${clientId}/nutrition`);
+}
+
+export async function deleteMealPlan(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  await must(supabase.from("meal_plans").delete().eq("id", String(form.get("id"))));
+  revalidatePath(`/clients/${clientId}/nutrition`);
+  redirect(`/clients/${clientId}/nutrition`);
 }

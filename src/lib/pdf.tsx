@@ -150,6 +150,82 @@ export async function planToPdf(
   return renderToBuffer(doc);
 }
 
+export interface MealPdfDay {
+  day: number;
+  meals: { name: string; items: { name: string; amount: string }[] }[];
+  totals: { kcal: number; protein: number; fat: number; carbs: number };
+}
+
+export async function mealPlanToPdf(
+  clientName: string,
+  title: string,
+  days: MealPdfDay[],
+  screenedFor: string[],
+  brand: TrainerBrand
+) {
+  const doc = (
+    <Document>
+      <Page size="LETTER" style={s.page}>
+        <View style={s.header} fixed>
+          <Image src={LOGO_PATH} style={s.logo} />
+          <View style={s.headerText}>
+            <Text style={s.headerBrand}>{brand.businessName.toUpperCase()}</Text>
+            {brand.credentials ? <Text style={s.headerCreds}>{brand.credentials}</Text> : null}
+          </View>
+        </View>
+        <View style={s.body}>
+          <Text style={s.h1}>{title}</Text>
+          <Text style={s.sub}>Prepared for {clientName} · {days.length} day{days.length > 1 ? "s" : ""}</Text>
+
+          {/* First thing on the page, not the footer: this is the sentence
+              that prevents a reaction. */}
+          <View style={s.box} wrap={false}>
+            <Text style={s.boxTitle}>Check every label</Text>
+            <Text>
+              {screenedFor.length > 0 ? `Foods were chosen to avoid: ${screenedFor.join(", ")}. ` : ""}
+              Brands differ in ingredients and cross-contact. Read the label of everything you buy, and
+              don&apos;t eat anything you&apos;re unsure about.
+            </Text>
+          </View>
+
+          {days.map((d) => (
+            <View key={d.day} wrap={false}>
+              <Text style={s.day}>
+                Day {d.day} — {Math.round(d.totals.kcal)} kcal · P {Math.round(d.totals.protein)} g · F {Math.round(d.totals.fat)} g · C {Math.round(d.totals.carbs)} g
+              </Text>
+              {d.meals.map((m, i) => (
+                <View key={i} style={s.row}>
+                  <Text style={{ width: "22%", fontFamily: "Helvetica-Bold" }}>{m.name}</Text>
+                  <Text style={{ width: "78%" }}>{m.items.map((it) => `${it.name} (${it.amount})`).join(" · ")}</Text>
+                </View>
+              ))}
+            </View>
+          ))}
+
+          <View style={s.footWrap} fixed>
+            <Text style={s.footBy}>
+              Prepared by {brand.coachName}
+              {brand.credentials ? `, ${brand.credentials}` : ""}
+              {brand.phone ? `  ·  ${brand.phone}` : ""}
+            </Text>
+            <Text style={s.footSafety}>
+              Calorie and macro figures are estimates from USDA data; your needs may differ. Adjust with{" "}
+              {brand.coachName.split(" ")[0]} based on how you feel and progress.
+            </Text>
+            <Text style={s.footLegal}>
+              General nutrition guidance for healthy adults, not medical nutrition therapy. If you have a
+              medical condition, are pregnant, or have a history of disordered eating, follow the advice of
+              your doctor or a registered dietitian instead.
+            </Text>
+            <Text style={s.footProduct}>Drafted with {PRODUCT.name} · Food data: USDA FoodData Central.</Text>
+          </View>
+        </View>
+      </Page>
+    </Document>
+  );
+  return renderToBuffer(doc);
+}
+
 /**
  * Body measurement chart — a designed, fillable AcroForm PDF.
  *

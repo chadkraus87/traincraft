@@ -46,6 +46,15 @@ only one.
   still fails; the full `qa_report` is stored either way. The trainer UI
   (`GenerateForm`, `BuildWorkoutForm`) blocks on this response—there is no job
   queue or generation-status polling in the app today.
+- **Meal plans** follow the same shape: `POST /api/meal-plans` → nutrition
+  scope-of-practice gate (`src/lib/nutrition/gates.ts`) → screen the closed
+  USDA food library for allergens, gluten and diet (`src/lib/nutrition/meals.ts`)
+  → Claude picks only `fdc_id` + grams via forced tool use
+  (`src/lib/ai/meal-builder.ts`) → code scales portions and computes every
+  number → QA → one retry → persist. The model writes no free text that
+  reaches a client. Delivery re-checks against the client's *current* profile
+  and targets (`liveMealPlanCheck`). Calorie targets never go below
+  `minCalories`. Every limitation tag must be classified in `gates.ts`.
 
 ## Non-negotiable rules
 1. **Contraindication filtering is a safety feature, not a nicety.** Exercises

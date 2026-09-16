@@ -322,6 +322,34 @@ async function main() {
     await rejects(db, `insert into training_sessions (trainer_id, client_id, starts_at) values ($1, $2, now())`, [TRAINER_B, clientA]),
     "trainer B cannot book a session for A's client", "trainer B booked a session against another trainer's client");
 
+  // ── Nutrition (0031, 0032) ────────────────────────────────────────────
+  await actAs(db, TRAINER_A);
+  await db.query(`insert into nutrition_profiles (client_id, trainer_id, activity_level, goal, allergens) values ($1, $2, 'light', 'lose', '{peanut}')`, [clientA, TRAINER_A]);
+  check(
+    await rejects(db, `update nutrition_profiles set allergens = '{mustard}' where client_id = $1`, [clientA]),
+    "an allergen outside the tracked nine can't be stored", "an unmatchable allergen string was stored");
+  await db.query(
+    `insert into meal_plans (trainer_id, client_id, title, days, meals_per_day, targets, plan, qa_report, status)
+     values ($1, $2, 'MP', 3, 4, '{}', '{}', '{}', 'final')`, [TRAINER_A, clientA]);
+  const foodCount = await db.query("select count(*)::int as n from foods where is_active");
+  check(foodCount.rows[0].n >= 50, "trainers can read the seeded food library", `only ${foodCount.rows[0].n} foods visible`);
+  check(
+    await rejects(db, `insert into foods (fdc_id, name, usda_description, category, animal_class, serving_g, serving_desc, max_serving_g, contains_gluten, kcal, protein_g, fat_g, carbs_g)
+      values (1, 'x', 'x', 'fruit', 'plant', 1, 'x', 1, false, 1, 1, 1, 1)`),
+    "trainers cannot add to the food library", "a trainer inserted a food");
+  const tamper = await db.query("update foods set allergens = '{}' where 'peanut' = any(allergens)");
+  check(tamper.rowCount === 0, "trainers cannot strip allergen tags from foods", "a trainer edited allergen tags in the shared library");
+  await actAs(db, TRAINER_B);
+  const bSeesNutrition = await db.query("select client_id::text as id from nutrition_profiles union all select id::text from meal_plans");
+  check(bSeesNutrition.rows.length === 0, "trainer B cannot see A's nutrition profiles or meal plans", "nutrition data leaked across tenants");
+  check(
+    await rejects(db, `insert into meal_plans (trainer_id, client_id, title, days, meals_per_day, targets, plan, qa_report, status)
+      values ($1, $2, 'x', 1, 2, '{}', '{}', '{}', 'final')`, [TRAINER_B, clientA]),
+    "trainer B cannot create a meal plan for A's client", "trainer B wrote a meal plan against another trainer's client");
+  check(
+    await rejects(db, `insert into nutrition_profiles (client_id, trainer_id, activity_level, goal) values ($1, $2, 'light', 'gain')`, [clientA, TRAINER_B]),
+    "trainer B cannot write A's client's nutrition profile", "trainer B wrote another trainer's client's nutrition profile");
+
   // ── Retention purge (0028) ────────────────────────────────────────────
   await admin.query(
     `insert into client_notes (trainer_id, client_id, note, created_at) values
