@@ -309,6 +309,19 @@ async function main() {
     await rejects(db, `insert into client_measurements (trainer_id, client_id, weight_lb) values ($1, $2, 150)`, [TRAINER_B, clientA]),
     "trainer B cannot log measurements on A's client", "trainer B wrote body measurements onto another trainer's client");
 
+  // ── Scheduling (0030) ─────────────────────────────────────────────────
+  await actAs(db, TRAINER_A);
+  await db.query(`insert into training_sessions (trainer_id, client_id, starts_at) values ($1, $2, now() + interval '1 day')`, [TRAINER_A, clientA]);
+  check(
+    await rejects(db, `insert into training_sessions (trainer_id, client_id, starts_at, status) values ($1, $2, now(), 'maybe')`, [TRAINER_A, clientA]),
+    "an unknown session status is rejected", "a session was stored with an invalid status");
+  await actAs(db, TRAINER_B);
+  const bSeesSessions = await db.query("select id from training_sessions");
+  check(bSeesSessions.rows.length === 0, "trainer B cannot see A's schedule", "training sessions leaked across tenants");
+  check(
+    await rejects(db, `insert into training_sessions (trainer_id, client_id, starts_at) values ($1, $2, now())`, [TRAINER_B, clientA]),
+    "trainer B cannot book a session for A's client", "trainer B booked a session against another trainer's client");
+
   // ── Retention purge (0028) ────────────────────────────────────────────
   await admin.query(
     `insert into client_notes (trainer_id, client_id, note, created_at) values
