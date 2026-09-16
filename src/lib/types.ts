@@ -12,7 +12,7 @@ export interface Limitation {
   id: string;
   client_id: string;
   tag: string;
-  detail: string | null;
+  side: "left" | "right" | "bilateral" | null;
   active: boolean;
 }
 

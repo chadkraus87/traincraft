@@ -2,6 +2,8 @@ import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { LIMITATION_LABELS } from "@/lib/safety/rules";
 import { PRODUCT } from "@/lib/brand";
+import { redirect } from "next/navigation";
+import { hasAcceptedCurrentTerms } from "@/lib/auth";
 
 const RING_RADIUS = 30;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -26,6 +28,10 @@ export default async function Dashboard({
       </div>
     );
   }
+
+  // The dashboard does its own auth check (it has a signed-out view), so it
+  // needs the terms gate explicitly rather than through requireUser().
+  if (!(await hasAcceptedCurrentTerms(supabase, user.id))) redirect("/accept-terms");
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const staleThreshold = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
@@ -54,7 +60,7 @@ export default async function Dashboard({
     supabase.from("client_goals").select("id, description, target_date, client_id, clients(full_name)")
       .eq("completed", false).not("target_date", "is", null).lte("target_date", goalHorizon)
       .order("target_date"),
-    supabase.from("client_limitations").select("id, tag, detail, client_id, created_at, clients(full_name)")
+    supabase.from("client_limitations").select("id, tag, client_id, created_at, clients(full_name)")
       .eq("active", true).lt("created_at", limitationStaleThreshold),
   ]);
 

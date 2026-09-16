@@ -25,6 +25,9 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient, tem
   const [templateId, setTemplateId] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Set when the server refused because intake is incomplete, so the error
+  // can point straight at the page that fixes it.
+  const [intakeClient, setIntakeClient] = useState<string | null>(null);
 
   const toggleEquipment = (type: string) => {
     setExtraEquipment((prev) =>
@@ -33,7 +36,7 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient, tem
   };
 
   const generate = async () => {
-    setBusy(true); setErr(null);
+    setBusy(true); setErr(null); setIntakeClient(null);
     try {
       // Applying a template skips Claude entirely — it's the template's
       // structure re-checked against THIS client's real safety pool, not
@@ -52,7 +55,7 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient, tem
         body: JSON.stringify(body),
       });
       const raw = await res.text();
-      let json: { id?: string; error?: string };
+      let json: { id?: string; error?: string; intakeRequired?: boolean };
       try {
         json = raw ? JSON.parse(raw) : {};
       } catch {
@@ -60,6 +63,7 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient, tem
           `Server returned an unexpected response (status ${res.status}). This usually means the request timed out — try again, or reduce weeks/days.`
         );
       }
+      if (json.intakeRequired) setIntakeClient(clientId);
       if (!res.ok || !json.id) throw new Error(json.error ?? "Generation failed");
       router.push(`/plans/${json.id}`);
     } catch (e) {
@@ -154,7 +158,14 @@ export default function GenerateForm({ clients, workoutTypes, defaultClient, tem
         </>
       )}
 
-      {err && <p className="text-sm text-alarm">{err}</p>}
+      {err && (
+        <p className="text-sm text-alarm">
+          {err}
+          {intakeClient && (
+            <> <a href={`/clients/${intakeClient}/intake`} className="underline">Open intake →</a></>
+          )}
+        </p>
+      )}
       <button className="btn w-full justify-center" onClick={generate} disabled={busy || !clientId}>
         {busy ? "Working…" : templateId ? "Apply template" : "Generate plan"}
       </button>

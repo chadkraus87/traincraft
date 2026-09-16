@@ -122,6 +122,12 @@ export default function SignUp() {
           </p>
         </div>
         <TurnstileWidget onToken={setCaptchaToken} resetSignal={captchaReset} />
+        <p className="text-xs text-steel">
+          Before using {PRODUCT.name} you&apos;ll be asked to accept the{" "}
+          <Link href="/legal/terms" target="_blank" className="underline">Terms</Link>,{" "}
+          <Link href="/legal/privacy" target="_blank" className="underline">Privacy Policy</Link> and{" "}
+          <Link href="/legal/dpa" target="_blank" className="underline">Data Processing Addendum</Link>.
+        </p>
         {err && <p className="text-sm text-alarm">{err}</p>}
         <button
           type="submit"

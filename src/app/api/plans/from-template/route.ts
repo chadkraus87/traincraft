@@ -19,6 +19,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { filterForLimitations, filterForEquipment, WORKOUT_TYPES, type LimitationTag } from "@/lib/safety/rules";
 import { validatePlan } from "@/lib/ai/validate";
+import { loadProgrammingGate } from "@/lib/intake/screening";
 import type { PlanJson } from "@/lib/types";
 
 export async function POST(req: Request) {
@@ -42,6 +43,14 @@ export async function POST(req: Request) {
     ]);
   if (!template) return NextResponse.json({ error: "Template not found" }, { status: 404 });
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+
+  // Pre-participation gate, same as generation: applying a template is still
+  // programming a client, so no screening, consent, or outstanding clearance
+  // blocks it here too.
+  const screening = await loadProgrammingGate(supabase, clientId);
+  if (!screening.allowed) {
+    return NextResponse.json({ error: screening.reasons.join(" "), intakeRequired: true }, { status: 409 });
+  }
 
   const limitationTags = (limitations ?? []).map((l) => l.tag as LimitationTag);
   const { allowed, excluded } = filterForLimitations(pool ?? [], limitationTags);

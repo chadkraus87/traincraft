@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { planToPdf } from "@/lib/pdf";
 import { getTrainerBrand } from "@/lib/brand-server";
+import { loadProgrammingGate } from "@/lib/intake/screening";
 import type { PlanJson, QaReport } from "@/lib/types";
 import { deriveQaForStoredPlan, isDeliverable } from "@/lib/ai/plan-qa";
 
@@ -22,6 +23,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .eq("id", id)
     .single();
   if (!plan) return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+
+  // A plan generated while the client was cleared must not be handed over
+  // after their screening lapses or reports symptoms — sending it is the
+  // moment the plan reaches the person the gate protects.
+  const screening = await loadProgrammingGate(supabase, plan.client_id);
+  if (!screening.allowed) {
+    return NextResponse.json({ error: screening.reasons.join(" ") }, { status: 409 });
+  }
 
   // QA gates delivery, and the verdict is recomputed here rather than read
   // off the stored status. Two reasons: a stored "final" can be stale (the

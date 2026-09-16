@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildWorkout } from "@/lib/ai/builder";
+import { loadProgrammingGate } from "@/lib/intake/screening";
 import { validatePlan } from "@/lib/ai/validate";
 import { WORKOUT_TYPES, EQUIPMENT_TYPES, type LimitationTag } from "@/lib/safety/rules";
 import type { QaReport } from "@/lib/types";
@@ -101,6 +102,15 @@ export async function POST(req: Request) {
       supabase.from("exercises").select("*").eq("is_active", true),
     ]);
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+
+  // Pre-participation gate. Checked before anything is generated or logged
+  // against the rate limit: a client with no screening, no recorded consent,
+  // or an outstanding medical clearance cannot be programmed, and a blocked
+  // request shouldn't cost the trainer a generation.
+  const screening = await loadProgrammingGate(supabase, clientId);
+  if (!screening.allowed) {
+    return NextResponse.json({ error: screening.reasons.join(" "), intakeRequired: true }, { status: 409 });
+  }
 
   // Recent logged performance for this client, so the builder can ground
   // load suggestions in what actually happened last time instead of a

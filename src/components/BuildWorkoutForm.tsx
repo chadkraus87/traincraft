@@ -25,6 +25,9 @@ export default function BuildWorkoutForm({ clients, workoutTypes, defaultClient 
   const [extraEquipment, setExtraEquipment] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Set when the server refused because intake is incomplete, so the error
+  // can point straight at the page that fixes it.
+  const [intakeClient, setIntakeClient] = useState<string | null>(null);
 
   const toggleEquipment = (type: string) => {
     setExtraEquipment((prev) =>
@@ -33,7 +36,7 @@ export default function BuildWorkoutForm({ clients, workoutTypes, defaultClient 
   };
 
   const generate = async () => {
-    setBusy(true); setErr(null);
+    setBusy(true); setErr(null); setIntakeClient(null);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -44,7 +47,7 @@ export default function BuildWorkoutForm({ clients, workoutTypes, defaultClient 
         }),
       });
       const raw = await res.text();
-      let json: { id?: string; error?: string };
+      let json: { id?: string; error?: string; intakeRequired?: boolean };
       try {
         json = raw ? JSON.parse(raw) : {};
       } catch {
@@ -52,6 +55,7 @@ export default function BuildWorkoutForm({ clients, workoutTypes, defaultClient 
           `Server returned an unexpected response (status ${res.status}). This usually means the request timed out — try again.`
         );
       }
+      if (json.intakeRequired) setIntakeClient(clientId);
       if (!res.ok || !json.id) throw new Error(json.error ?? "Generation failed");
       router.push(`/plans/${json.id}`);
     } catch (e) {
@@ -119,7 +123,14 @@ export default function BuildWorkoutForm({ clients, workoutTypes, defaultClient 
         </p>
       </div>
 
-      {err && <p className="text-sm text-alarm">{err}</p>}
+      {err && (
+        <p className="text-sm text-alarm">
+          {err}
+          {intakeClient && (
+            <> <a href={`/clients/${intakeClient}/intake`} className="underline">Open intake →</a></>
+          )}
+        </p>
+      )}
       <button className="btn w-full justify-center" onClick={generate} disabled={busy || !clientId}>
         {busy ? "Programming… (safety filter → Claude → QA)" : "Generate workout"}
       </button>

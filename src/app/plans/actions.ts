@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
 import { filterForLimitations, filterForEquipment, WORKOUT_TYPES, type LimitationTag } from "@/lib/safety/rules";
 import { deriveQaForStoredPlan } from "@/lib/ai/plan-qa";
+import { loadProgrammingGate } from "@/lib/intake/screening";
 import type { PlanJson, QaReport } from "@/lib/types";
 
 export async function deletePlan(form: FormData) {
@@ -55,6 +56,9 @@ export async function confirmDeliverySent(planId: string, channel: "email") {
     .eq("id", planId)
     .single();
   if (!planRow) throw new Error("Plan not found");
+
+  const screening = await loadProgrammingGate(supabase, planRow.client_id);
+  if (!screening.allowed) throw new Error(screening.reasons.join(" "));
 
   const destination = (planRow.clients as unknown as { email: string | null } | null)?.email;
   if (!destination) throw new Error("This client has no email address on file.");

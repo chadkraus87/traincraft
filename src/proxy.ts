@@ -12,6 +12,9 @@ const PUBLIC_PATHS = [
   "/login",
   "/signup",
   "/auth/callback",
+  // Terms, privacy policy and DPA must be readable before signing in — that
+  // is the point of publishing them.
+  "/legal",
   // Sentry's browser tunnel. Error reports POST here from pages that may
   // already have a broken session — gating it would mean the errors most
   // worth seeing are the ones that never arrive. It accepts only Sentry

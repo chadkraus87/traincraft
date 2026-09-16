@@ -238,6 +238,94 @@ async function main() {
     "trainer A could not delete their own custom exercise (missing DELETE policy)"
   );
 
+  // ── Intake, consent and legal acceptance (0027) ──────────────────────
+  const screeningCols = `trainer_id, client_id, currently_active, known_cardiovascular_disease,
+    known_metabolic_disease, known_renal_disease, has_symptoms, eating_disorder_history,
+    consent_data_storage, waiver_signed`;
+  await actAs(db, TRAINER_A);
+  await db.query(
+    `insert into client_screenings (${screeningCols}) values ($1, $2, true, false, false, false, false, false, true, true)`,
+    [TRAINER_A, clientA]
+  );
+  await db.query(
+    `insert into legal_acceptances (trainer_id, terms_version, privacy_version, dpa_version,
+       attested_fitness_professional, attested_no_medical_services, attested_us_based, attested_age_18)
+     values ($1, 'v1', 'v1', 'v1', true, true, true, true)`,
+    [TRAINER_A]
+  );
+
+  // Append-only: an audit record the recorded party can edit is not a record.
+  const editedScreening = await db.query(
+    "update client_screenings set has_symptoms = true where client_id = $1 returning id", [clientA]
+  );
+  check(editedScreening.rows.length === 0, "screenings cannot be edited after the fact",
+    "a trainer rewrote a stored screening");
+  const deletedAcceptance = await db.query("delete from legal_acceptances where trainer_id = $1 returning id", [TRAINER_A]);
+  check(deletedAcceptance.rows.length === 0, "terms acceptances cannot be deleted by the trainer",
+    "a trainer erased their own terms acceptance");
+
+  check(
+    await rejects(db,
+      `insert into legal_acceptances (trainer_id, terms_version, privacy_version, dpa_version,
+         attested_fitness_professional, attested_no_medical_services, attested_us_based, attested_age_18)
+       values ($1, 'v1', 'v1', 'v1', true, false, true, true)`, [TRAINER_A]),
+    "an acceptance cannot be stored without every attestation",
+    "a partial attestation was recorded as an acceptance"
+  );
+  check(
+    await rejects(db,
+      `insert into client_screenings (${screeningCols}) values ($1, $2, true, false, false, false, false, false, false, true)`,
+      [TRAINER_A, clientA]),
+    "a screening cannot be stored without storage consent",
+    "health screening stored without the client's consent"
+  );
+
+  await actAs(db, TRAINER_B);
+  const bSeesScreenings = await db.query("select id from client_screenings");
+  check(bSeesScreenings.rows.length === 0, "trainer B cannot read A's client screenings", "screenings leaked across tenants");
+  const bSeesAcceptances = await db.query("select id from legal_acceptances");
+  check(bSeesAcceptances.rows.length === 0, "trainer B cannot read A's terms acceptances", "acceptances leaked across tenants");
+  check(
+    await rejects(db,
+      `insert into client_screenings (${screeningCols}) values ($1, $2, true, false, false, false, false, false, true, true)`,
+      [TRAINER_B, clientA]),
+    "trainer B cannot record a screening on A's client",
+    "trainer B wrote health screening data onto another trainer's client"
+  );
+
+  // ── Progress tracking (0029) ──────────────────────────────────────────
+  await actAs(db, TRAINER_A);
+  await db.query(`insert into client_measurements (trainer_id, client_id, weight_lb) values ($1, $2, 180)`, [TRAINER_A, clientA]);
+  await db.query(
+    `insert into client_checkins (trainer_id, client_id, energy, sleep_quality, soreness, stress, adherence)
+     values ($1, $2, 3, 3, 3, 3, 3)`, [TRAINER_A, clientA]);
+  check(
+    await rejects(db, `insert into client_measurements (trainer_id, client_id, weight_lb) values ($1, $2, 1800)`, [TRAINER_A, clientA]),
+    "an impossible measurement is rejected by the database", "a 1800 lb weight was stored");
+  await actAs(db, TRAINER_B);
+  const bSeesProgress = await db.query("select id from client_measurements union all select id from client_checkins");
+  check(bSeesProgress.rows.length === 0, "trainer B cannot read A's measurements or check-ins", "progress data leaked across tenants");
+  check(
+    await rejects(db, `insert into client_measurements (trainer_id, client_id, weight_lb) values ($1, $2, 150)`, [TRAINER_B, clientA]),
+    "trainer B cannot log measurements on A's client", "trainer B wrote body measurements onto another trainer's client");
+
+  // ── Retention purge (0028) ────────────────────────────────────────────
+  await admin.query(
+    `insert into client_notes (trainer_id, client_id, note, created_at) values
+       ($1, $2, 'old', now() - interval '19 months'), ($1, $2, 'recent', now() - interval '1 month')`,
+    [TRAINER_A, clientA]
+  );
+  const purgeDenied = await rejects(db, "select public.purge_expired_data()");
+  check(purgeDenied, "a signed-in trainer cannot trigger the cross-tenant purge",
+    "purge_expired_data is callable by an ordinary session");
+  await admin.query("select public.purge_expired_data()");
+  const notesLeft = await admin.query("select note from client_notes where client_id = $1 order by note", [clientA]);
+  check(
+    notesLeft.rows.length === 1 && notesLeft.rows[0].note === "recent",
+    "retention purge deletes notes past 18 months and keeps recent ones",
+    `notes remaining: ${JSON.stringify(notesLeft.rows)}`
+  );
+
   // ── delete_own_account: a SECURITY DEFINER function, so prove its blast
   //    radius. It runs with the definer's privileges and can write to
   //    auth.users, which is exactly the kind of function that becomes a
