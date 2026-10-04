@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { loadNutritionContext } from "@/lib/nutrition/context";
-import { ALLERGENS, ALLERGEN_LABELS, DIETS } from "@/lib/nutrition/gates";
+import { ALLERGENS, ALLERGEN_LABELS, DIETS, MEDICATIONS, MEDICATION_LABELS, LIFE_STAGES, LIFE_STAGE_LABELS } from "@/lib/nutrition/gates";
 import { ACTIVITY_LEVELS, GOALS } from "@/lib/nutrition/macros";
 import MealPlanForm from "@/components/MealPlanForm";
 import { saveNutritionProfile } from "../../actions";
@@ -133,6 +133,44 @@ export default async function NutritionPage({ params }: { params: Promise<{ id: 
               <input type="checkbox" name="severe_allergy" defaultChecked={profile?.severe_allergy} className="mt-1" />
               <span>Has had anaphylaxis or carries an epinephrine auto-injector</span>
             </label>
+
+            <fieldset className="pt-3 border-t border-steel/15 space-y-3">
+              <legend className="label">Medicines and life stage</legend>
+              <p className="text-xs text-steel">
+                Foods in the library interact with some medicines, and pregnancy and breastfeeding
+                change energy needs. Until these are answered, calorie deficits and meal plans stay
+                off — targets still show.
+              </p>
+              <label className="flex gap-2 text-sm items-start">
+                <input
+                  type="checkbox"
+                  name="medical_screening_done"
+                  defaultChecked={profile?.life_stage !== null && profile?.life_stage !== undefined}
+                  className="mt-1"
+                />
+                <span>I asked this client the questions below.</span>
+              </label>
+              <label className="block">
+                <span className="label">Pregnant or breastfeeding?</span>
+                <select name="life_stage" defaultValue={profile?.life_stage ?? "none"} className="input">
+                  {LIFE_STAGES.map((v) => <option key={v} value={v}>{LIFE_STAGE_LABELS[v]}</option>)}
+                </select>
+              </label>
+              <div className="space-y-1 text-sm">
+                <span className="label">Takes any of these</span>
+                {MEDICATIONS.map((m) => (
+                  <label key={m} className="flex gap-2 items-start">
+                    <input type="checkbox" name="medications" value={m} defaultChecked={profile?.medications?.includes(m)} className="mt-1" />
+                    <span>{MEDICATION_LABELS[m]}</span>
+                  </label>
+                ))}
+                <label className="flex gap-2 items-start">
+                  <input type="checkbox" name="other_medication" defaultChecked={profile?.other_medication ?? false} className="mt-1" />
+                  <span>Takes any other prescription medicine</span>
+                </label>
+              </div>
+            </fieldset>
+
             <button type="submit" className="btn-ghost w-full justify-center">Save profile</button>
           </form>
         </div>

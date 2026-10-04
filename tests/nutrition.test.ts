@@ -1,6 +1,6 @@
 /** TEST · Macro calculator and nutrition scope-of-practice gates. */
 import { calculateTargets } from "../src/lib/nutrition/macros";
-import { nutritionGate, MEDICAL_NUTRITION_TAGS, NUTRITION_NEUTRAL_TAGS, type NutritionGateInput } from "../src/lib/nutrition/gates";
+import { nutritionGate, MEDICAL_NUTRITION_TAGS, NUTRITION_NEUTRAL_TAGS, MEDICATIONS, type NutritionGateInput } from "../src/lib/nutrition/gates";
 import type { ScreeningRow } from "../src/lib/intake/screening";
 import type { NutritionProfile } from "../src/lib/nutrition/gates";
 import { screenFoods, validateMealPlan, scalePortions, dayTotals, isBetterMealAttempt, type Food, type MealPlanJson, type MealQaReport } from "../src/lib/nutrition/meals";
@@ -56,7 +56,7 @@ const screening: ScreeningRow = {
 };
 const base: NutritionGateInput = {
   screening, screeningAllowed: true, limitationTags: [], age: 35, bmi: 24, hasBasics: true,
-  profile: { activity_level: "moderate", goal: "lose", diet: "none", allergens: [], gluten_free: false, other_allergy: false, severe_allergy: false },
+  profile: { activity_level: "moderate", goal: "lose", diet: "none", allergens: [], gluten_free: false, other_allergy: false, severe_allergy: false, life_stage: "none", medications: [], other_medication: false },
 };
 const g = (over: Partial<NutritionGateInput>) => nutritionGate({ ...base, ...over });
 const withProfile = (p: Partial<NonNullable<NutritionGateInput["profile"]>>) => g({ profile: { ...base.profile!, ...p } });
@@ -110,7 +110,7 @@ check("an incomplete screening blocks everything", (() => { const r = g({ screen
   ];
   const prof = (o: Partial<NutritionProfile> = {}): NutritionProfile => ({
     activity_level: "light", goal: "maintain", diet: "none", allergens: [], gluten_free: false,
-    other_allergy: false, severe_allergy: false, ...o,
+    other_allergy: false, severe_allergy: false, life_stage: "none", medications: [], other_medication: false, ...o,
   });
   const ids = (p: NutritionProfile) => screenFoods(lib, p).map((f) => f.id);
 
@@ -225,7 +225,7 @@ check("a minor gets no calorie targets at all", !g({ age: 16 }).targets);
     max_serving_g: 300, allergens: [], contains_gluten: false, kcal: 100, protein_g: 10, fat_g: 3, carbs_g: 8, is_active: true,
   });
   const lib2 = ["a", "b", "c", "d", "e", "f", "g", "h"].map(food);
-  const p2: NutritionProfile = { activity_level: "light", goal: "maintain", diet: "none", allergens: [], gluten_free: false, other_allergy: false, severe_allergy: false };
+  const p2: NutritionProfile = { activity_level: "light", goal: "maintain", diet: "none", allergens: [], gluten_free: false, other_allergy: false, severe_allergy: false, life_stage: "none", medications: [], other_medication: false };
   const mealOf = (ids: string[]) => ({ name: "M", items: ids.map((food_id) => ({ food_id, grams: 200 })) });
   const sameSixBothDays: MealPlanJson = { days: [1, 2].map((day) => ({ day, meals: [mealOf(["a", "b", "c"]), mealOf(["d", "e", "f"])] })) };
   const T2 = { calories: 1200, proteinG: 120, minCalories: 0 };
@@ -236,6 +236,42 @@ check("a minor gets no calorie targets at all", !g({ age: 16 }).targets);
   ] };
   check("variety: a repeated-food day fails even when the plan is varied overall",
     validateMealPlan(thinDay, lib2, p2, T2, 2, 2, 1).checks.find((c) => c.name === "variety")?.pass === false);
+}
+
+// ── Medication and life-stage screening ─────────────────────────────────
+{
+  const unanswered = (p: Partial<NonNullable<NutritionGateInput["profile"]>>) => withProfile(p);
+
+  check("an unanswered pregnancy question blocks deficits and meal plans",
+    (() => { const r = unanswered({ life_stage: null }); return !r.deficit && !r.mealPlans; })());
+  check("an unanswered pregnancy question still allows targets",
+    unanswered({ life_stage: null }).targets);
+  check("an unanswered medication question blocks deficits and meal plans",
+    (() => { const r = unanswered({ medications: null }); return !r.deficit && !r.mealPlans; })());
+  check("an unanswered other-medication question blocks",
+    !unanswered({ other_medication: null }).mealPlans);
+
+  for (const stage of ["pregnant", "lactating"] as const) {
+    const r = withProfile({ life_stage: stage });
+    check(`${stage}: no targets, no deficit, no meal plan`, !r.targets && !r.deficit && !r.mealPlans);
+    check(`${stage}: the reason names a dietitian`, r.reasons.some((x) => /registered dietitian/i.test(x)));
+  }
+
+  for (const med of MEDICATIONS) {
+    const r = withProfile({ medications: [med] });
+    check(`${med} blocks deficits and meal plans`, !r.deficit && !r.mealPlans);
+    check(`${med} still allows calorie targets`, r.targets);
+  }
+  check("several medications are all named in the reason",
+    (() => { const r = withProfile({ medications: ["anticoagulant", "lithium"] });
+      return r.reasons.some((x) => /blood thinner/i.test(x) && /lithium/i.test(x)); })());
+  check("an unrecognised medication fails closed",
+    !withProfile({ medications: ["something_else"] }).mealPlans);
+  check("an off-list medicine blocks via the other-medication flag",
+    !withProfile({ other_medication: true }).mealPlans);
+  check("a client on no medicines and not pregnant is unaffected",
+    (() => { const r = withProfile({ life_stage: "none", medications: [], other_medication: false });
+      return r.targets && r.deficit && r.mealPlans; })());
 }
 
 console.log(failures === 0 ? "\nALL NUTRITION TESTS PASSED" : `\n${failures} FAILURES`);

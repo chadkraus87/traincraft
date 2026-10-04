@@ -328,6 +328,17 @@ async function main() {
   check(
     await rejects(db, `update nutrition_profiles set allergens = '{mustard}' where client_id = $1`, [clientA]),
     "an allergen outside the tracked nine can't be stored", "an unmatchable allergen string was stored");
+  check(
+    await rejects(db, `update nutrition_profiles set medications = '{aspirin}' where client_id = $1`, [clientA]),
+    "a medication outside the screened list can't be stored", "an unscreenable medication string was stored");
+  check(
+    await rejects(db, `update nutrition_profiles set life_stage = 'maybe' where client_id = $1`, [clientA]),
+    "an invalid life stage is rejected", "an invalid life_stage was stored");
+  const unanswered = await db.query("select life_stage, medications, other_medication from nutrition_profiles where client_id = $1", [clientA]);
+  check(
+    unanswered.rows[0].life_stage === null && unanswered.rows[0].medications === null && unanswered.rows[0].other_medication === null,
+    "medical screening columns default to null, not to a permissive answer",
+    `got ${JSON.stringify(unanswered.rows[0])}`);
   await db.query(
     `insert into meal_plans (trainer_id, client_id, title, days, meals_per_day, targets, plan, qa_report, status)
      values ($1, $2, 'MP', 3, 4, '{}', '{}', '{}', 'final')`, [TRAINER_A, clientA]);
