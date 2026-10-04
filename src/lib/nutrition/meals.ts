@@ -322,7 +322,16 @@ export function validateMealPlan(
       if (t.fiber_g < floor) return [`day ${t.day}: ${r(t.fiber_g)} g (at least ${r(floor)} g for ${r(t.kcal)} kcal)`];
       // A ceiling as well as a floor: a bean-and-seed day can clear 100 g,
       // which is acute GI distress and an obstruction risk with any stricture.
-      if (t.fiber_g > 60) return [`day ${t.day}: ${r(t.fiber_g)} g (upper limit 60 g)`];
+      //
+      // 70 g, not 60. At 60 the ceiling collided with the protein target for
+      // vegan plans — every plant protein in the library carries fibre, so a
+      // 115 g protein day lands near 60-70 g by arithmetic, and a real
+      // generation run failed twice on exactly that. A limit that a whole
+      // legitimate diet pattern cannot satisfy produces drafts nobody can fix,
+      // which is how trainers learn to ignore the warning. 70 g is the top of
+      // the range the clinical review gave and still catches the ~100 g day
+      // the check exists for.
+      if (t.fiber_g > 70) return [`day ${t.day}: ${r(t.fiber_g)} g (upper limit 70 g)`];
       return [];
     }),
     "fibre within range every day");
@@ -371,13 +380,17 @@ export function validateMealPlan(
   const days_ = Math.max(1, plan.days.length);
   const advisories: string[] = [];
   if (totals.some((t) => t.unknown.has("fiber_g"))) {
-    advisories.push("Fibre is understated: the food library has no fibre figure for at least one food in this plan.");
+    const noFibre = [...new Set(items.map((i) => byId.get(i.food_id)).filter((f) => f && (f.fiber_g === null || f.fiber_g === undefined)).map((f) => f!.name))];
+    advisories.push(`Fibre is understated: the food library has no fibre figure for ${noFibre.join(", ") || "at least one food in this plan"}.`);
   }
   for (const [key, ref] of Object.entries(DAILY_REFERENCE) as [NutrientKey, typeof DAILY_REFERENCE[NutrientKey]][]) {
     const anyUnknown = totals.some((t) => t.unknown.has(key as never));
+    const culprits = anyUnknown
+      ? [...new Set(items.map((i) => byId.get(i.food_id)).filter((f) => f && (f[key] === null || f[key] === undefined)).map((f) => f!.name))]
+      : [];
     const perDay = totals.reduce((sum, t) => sum + (t[key as keyof typeof t] as number), 0) / days_;
     if (anyUnknown) {
-      advisories.push(`${ref.label} can't be totalled — the food library has no value for at least one food in this plan.`);
+      advisories.push(`${ref.label} can't be totalled — the food library has no value for ${culprits.join(", ") || "at least one food in this plan"}.`);
     } else if (perDay < ref.amount) {
       advisories.push(
         `${ref.label}: about ${Math.round(perDay * 10) / 10} ${ref.unit} a day against an adult reference of ${ref.amount} ${ref.unit}.` +
