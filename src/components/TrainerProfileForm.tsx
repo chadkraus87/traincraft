@@ -2,12 +2,15 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { saveTrainerProfile } from "@/app/settings/actions";
+import { US_STATES } from "@/lib/nutrition/gates";
 
 export interface TrainerProfileValues {
   business_name: string | null;
   coach_name: string | null;
   credentials: string | null;
   phone: string | null;
+  practice_state: string | null;
+  nutrition_credential: boolean | null;
 }
 
 /**
@@ -105,6 +108,43 @@ export default function TrainerProfileForm({
           Optional. Your business number, so clients can reach you about their plan.
         </p>
       </div>
+
+      <fieldset className="pt-4 border-t border-steel/15">
+        <legend className="label">Nutrition practice</legend>
+        <p className="text-xs text-steel mb-3">
+          Nutrition rules differ by state. Some states restrict calorie targets and meal plans to
+          licensed practitioners whatever the client&apos;s health; others don&apos;t. Until this is set,
+          the nutrition features stay off.
+        </p>
+        <label className="label" htmlFor="practice_state">State you practise in</label>
+        <select
+          id="practice_state"
+          name="practice_state"
+          className="input"
+          defaultValue={profile?.practice_state ?? ""}
+        >
+          <option value="">Not set</option>
+          {US_STATES.map((st) => <option key={st} value={st}>{st}</option>)}
+        </select>
+
+        <label className="flex gap-2 text-sm items-start mt-3">
+          <input
+            type="checkbox"
+            name="nutrition_credential"
+            defaultChecked={profile?.nutrition_credential ?? false}
+            className="mt-1"
+          />
+          <span>
+            I hold a licence, registration or certification that permits me to provide nutrition
+            services in my state (for example RD, RDN, LD, LDN, CNS).
+            <span className="block text-xs text-steel mt-0.5">
+              Tick this only if it is true. It turns the nutrition features on regardless of the
+              state rules above, because those rules restrict unlicensed practice — and the date you
+              ticked it is recorded.
+            </span>
+          </span>
+        </label>
+      </fieldset>
 
       <div className="flex items-center gap-3">
         <button type="submit" className="btn" disabled={pending}>

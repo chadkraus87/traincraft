@@ -84,6 +84,26 @@ export interface NutritionProfile {
   other_medication: boolean | null;
 }
 
+/** US states and territories, for the Settings selector. */
+export const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME",
+  "MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI",
+  "SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","PR","VI","GU","AS","MP",
+] as const;
+
+export const STATE_POSTURES = ["permitted", "restricted", "unreviewed"] as const;
+export type StatePosture = (typeof STATE_POSTURES)[number];
+
+/** Where the trainer practises, and what that means for nutrition. */
+export interface PracticeContext {
+  /** Two-letter state. Null means they have not set one. */
+  state: string | null;
+  /** The reviewed posture for that state, or null when the state has no row. */
+  posture: StatePosture | null;
+  /** Trainer-attested licence permitting nutrition services. Unverified. */
+  credential: boolean | null;
+}
+
 export interface NutritionGateInput {
   screening: ScreeningRow | null;
   screeningAllowed: boolean;
@@ -92,6 +112,7 @@ export interface NutritionGateInput {
   bmi: number | null;
   hasBasics: boolean; // sex, birth year, height, and a weight
   profile: NutritionProfile | null;
+  practice: PracticeContext;
 }
 
 export interface NutritionGate {
@@ -133,6 +154,22 @@ export function nutritionGate(i: NutritionGateInput): NutritionGate {
     if (what.mealPlans) mealPlans = false;
     reasons.push(reason);
   };
+
+  // Where the trainer practises decides whether any of this is lawful for
+  // them to provide, so it runs before the client's own circumstances. A
+  // trainer who attests to holding a nutrition licence is not who these
+  // statutes restrict, so that attestation satisfies the gate.
+  if (!i.practice.credential) {
+    const all = { targets: true, deficit: true, mealPlans: true };
+    if (!i.practice.state) {
+      block(all, "Set the state you practise in, in Settings. Nutrition rules differ by state, so this app won't produce nutrition output until it knows which ones apply.");
+    } else if (i.practice.posture !== "permitted") {
+      const reviewed = i.practice.posture === "restricted";
+      block(all, reviewed
+        ? `Providing calorie targets or meal plans without a nutrition licence isn't permitted in ${i.practice.state}. If you hold one, record it in Settings. ${RD}`
+        : `Nutrition is off in ${i.practice.state} until this app's legal review covers that state. If you hold a nutrition licence or registration, record it in Settings.`);
+    }
+  }
 
   if (!i.screeningAllowed || !i.screening) {
     block({ targets: true, deficit: true, mealPlans: true }, "Complete this client's health screening and consent first.");

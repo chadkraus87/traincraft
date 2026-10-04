@@ -36,7 +36,8 @@ export default async function NutritionPage({ params }: { params: Promise<{ id: 
           </ul>
           <p className="text-xs text-steel mt-2">
             <Link href={`/clients/${id}/intake`} className="underline">Intake</Link> ·{" "}
-            <Link href={`/clients/${id}/progress`} className="underline">Log a weight</Link>
+            <Link href={`/clients/${id}/progress`} className="underline">Log a weight</Link> ·{" "}
+            <Link href="/settings" className="underline">Practice state</Link>
           </p>
         </div>
       )}

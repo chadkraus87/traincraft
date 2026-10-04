@@ -56,6 +56,9 @@ const screening: ScreeningRow = {
 };
 const base: NutritionGateInput = {
   screening, screeningAllowed: true, limitationTags: [], age: 35, bmi: 24, hasBasics: true,
+  // A trainer in a state counsel has cleared, so the state gate is out of the
+  // way for every other case below; it has its own block of tests.
+  practice: { state: "TX", posture: "permitted", credential: false },
   profile: { activity_level: "moderate", goal: "lose", diet: "none", allergens: [], gluten_free: false, other_allergy: false, severe_allergy: false, life_stage: "none", medications: [], other_medication: false },
 };
 const g = (over: Partial<NutritionGateInput>) => nutritionGate({ ...base, ...over });
@@ -278,6 +281,41 @@ check("a minor gets no calorie targets at all", !g({ age: 16 }).targets);
   check("a client on no medicines and not pregnant is unaffected",
     (() => { const r = withProfile({ life_stage: "none", medications: [], other_medication: false });
       return r.targets && r.deficit && r.mealPlans; })());
+}
+
+// ── Practice-state gating ───────────────────────────────────────────────
+{
+  const inState = (practice: NutritionGateInput["practice"]) => g({ practice });
+
+  check("no state set blocks everything",
+    (() => { const r = inState({ state: null, posture: null, credential: false });
+      return !r.targets && !r.deficit && !r.mealPlans; })());
+  check("no state set says where to fix it",
+    inState({ state: null, posture: null, credential: false }).reasons.some((x) => /Settings/.test(x)));
+
+  check("an unreviewed state blocks everything",
+    (() => { const r = inState({ state: "CA", posture: "unreviewed", credential: false });
+      return !r.targets && !r.deficit && !r.mealPlans; })());
+  check("a state with no policy row at all blocks (fails closed)",
+    !inState({ state: "CA", posture: null, credential: false }).targets);
+  check("a restricted state blocks and refers to a dietitian",
+    (() => { const r = inState({ state: "CA", posture: "restricted", credential: false });
+      return !r.mealPlans && r.reasons.some((x) => /registered dietitian/i.test(x)); })());
+  check("a restricted state's reason names the state",
+    inState({ state: "OH", posture: "restricted", credential: false }).reasons.some((x) => /\bOH\b/.test(x)));
+
+  check("a permitted state allows nutrition", inState({ state: "TX", posture: "permitted", credential: false }).mealPlans);
+
+  // A licensed practitioner is not who these statutes restrict.
+  for (const posture of ["unreviewed", "restricted", null] as const) {
+    check(`an attested credential clears a ${posture ?? "missing"} state`,
+      inState({ state: "CA", posture, credential: true }).mealPlans);
+  }
+  check("a credential does not excuse a missing state... it still works, because the licence is the permission",
+    inState({ state: null, posture: null, credential: true }).mealPlans);
+  check("a credential does not bypass the client's own gates",
+    !g({ practice: { state: "CA", posture: "restricted", credential: true },
+         screening: { ...screening, eating_disorder_history: true } }).mealPlans);
 }
 
 // ── Nutritional adequacy checks ─────────────────────────────────────────
