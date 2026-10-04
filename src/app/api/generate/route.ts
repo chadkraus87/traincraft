@@ -11,21 +11,15 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildWorkout } from "@/lib/ai/builder";
+import { loadProgrammingGate } from "@/lib/intake/screening";
 import { validatePlan } from "@/lib/ai/validate";
 import { WORKOUT_TYPES, EQUIPMENT_TYPES, type LimitationTag } from "@/lib/safety/rules";
 import type { QaReport } from "@/lib/types";
 import { z } from "zod";
+import { overGenerationLimit, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit";
+import { hasAcceptedCurrentTerms, TERMS_REQUIRED } from "@/lib/auth";
 
 export const maxDuration = 120;
-
-/**
- * Per-trainer generation quota. Enforced against generation_events rather
- * than process memory, because serverless instances are recycled and
- * requests fan out — a module-level counter would reset constantly and
- * enforce nothing.
- */
-const RATE_LIMIT = 30;
-const RATE_WINDOW_MS = 60 * 60 * 1000;
 
 /**
  * weeks and daysPerWeek used to be read straight off the body with no upper
@@ -51,23 +45,17 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
+  // Terms gate, same as the pages. A route that processes client health data
+  // must not run for a trainer who hasn't accepted the current versions.
+  if (!(await hasAcceptedCurrentTerms(supabase, user.id))) {
+    return NextResponse.json({ error: TERMS_REQUIRED, termsRequired: true }, { status: 403 });
+  }
+
   // Rate limit before doing any work. Each request costs one or two Claude
   // calls against a shared API key, so an unbounded endpoint lets any
   // account drain the budget for everyone.
-  const windowStart = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
-  const { count: recentCount } = await supabase
-    .from("generation_events")
-    .select("id", { count: "exact", head: true })
-    .eq("trainer_id", user.id)
-    .gte("created_at", windowStart);
-
-  if ((recentCount ?? 0) >= RATE_LIMIT) {
-    return NextResponse.json(
-      {
-        error: `You've generated ${RATE_LIMIT} plans in the last hour, which is the current limit. Try again shortly — this cap is here so one busy account can't slow generation down for everyone.`,
-      },
-      { status: 429 }
-    );
+  if (await overGenerationLimit(supabase, user.id)) {
+    return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
   }
 
   const body = await req.json();
@@ -101,6 +89,15 @@ export async function POST(req: Request) {
       supabase.from("exercises").select("*").eq("is_active", true),
     ]);
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+
+  // Pre-participation gate. Checked before anything is generated or logged
+  // against the rate limit: a client with no screening, no recorded consent,
+  // or an outstanding medical clearance cannot be programmed, and a blocked
+  // request shouldn't cost the trainer a generation.
+  const screening = await loadProgrammingGate(supabase, clientId);
+  if (!screening.allowed) {
+    return NextResponse.json({ error: screening.reasons.join(" "), intakeRequired: true }, { status: 409 });
+  }
 
   // Recent logged performance for this client, so the builder can ground
   // load suggestions in what actually happened last time instead of a

@@ -2,8 +2,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUserOrThrow } from "@/lib/auth";
 import { isKnownLimitationTag } from "@/lib/safety/rules";
 import type { PlanJson } from "@/lib/types";
+import { MEASUREMENT_FIELDS, CHECKIN_FIELDS } from "@/lib/progress";
+import { ALLERGENS, DIETS } from "@/lib/nutrition/gates";
+import { ACTIVITY_LEVELS, GOALS } from "@/lib/nutrition/macros";
 
 /**
  * Awaits a Supabase write and throws if it failed.
@@ -20,8 +24,8 @@ async function must(op: PromiseLike<{ error: { message: string } | null }>): Pro
 
 async function uid() {
   const supabase = await supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in");
+  // requireUserOrThrow also enforces terms acceptance.
+  const user = await requireUserOrThrow();
   return { supabase, userId: user.id };
 }
 
@@ -296,4 +300,181 @@ export async function deleteClientNote(form: FormData) {
     supabase.from("client_notes").delete().eq("id", noteId)
   );
   revalidatePath(`/clients/${clientId}`);
+}
+
+// ── Intake ──────────────────────────────────────────────────────────────
+
+const SCREENING_QUESTIONS = [
+  "currently_active",
+  "known_cardiovascular_disease",
+  "known_metabolic_disease",
+  "known_renal_disease",
+  "has_symptoms",
+  "eating_disorder_history",
+] as const;
+
+/**
+ * Records a new screening. Append-only: there is no update path, so a
+ * correction is a fresh screening and the history of what was attested, and
+ * when, is preserved.
+ *
+ * Every health question must be answered yes or no explicitly. An unticked
+ * checkbox can't distinguish "no" from "skipped", and a skipped symptom
+ * question silently becoming "no symptoms" is the same fail-open shape as the
+ * `if (!rule) continue` bug this codebase already paid for once.
+ */
+export async function recordScreening(form: FormData) {
+  const { supabase, userId } = await uid();
+  const clientId = String(form.get("client_id"));
+
+  const answers: Record<string, boolean> = {};
+  for (const q of SCREENING_QUESTIONS) {
+    const v = form.get(q);
+    if (v !== "yes" && v !== "no") throw new Error("Answer every screening question yes or no.");
+    answers[q] = v === "yes";
+  }
+  if (form.get("consent_data_storage") !== "on") {
+    throw new Error("You need the client's consent before storing their health information.");
+  }
+
+  const clearance = String(form.get("clearance_obtained_on") || "");
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (clearance && (!/^\d{4}-\d{2}-\d{2}$/.test(clearance) || clearance > todayIso)) {
+    throw new Error("Medical clearance date can't be in the future.");
+  }
+  await must(
+    supabase.from("client_screenings").insert({
+      trainer_id: userId,
+      client_id: clientId,
+      ...answers,
+      consent_data_storage: true,
+      waiver_signed: form.get("waiver_signed") === "on",
+      clearance_obtained_on: clearance || null,
+    })
+  );
+  revalidatePath(`/clients/${clientId}/intake`);
+  revalidatePath(`/clients/${clientId}`);
+}
+
+/** Inputs for the energy equations. All optional until nutrition needs them. */
+export async function updateClientBasics(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  const num = (key: string) => {
+    const v = Number(form.get(key));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  };
+  const feet = num("height_ft");
+  const inches = Number(form.get("height_in_part") || 0);
+  const sex = String(form.get("sex_for_calculations") || "");
+
+  await must(
+    supabase
+      .from("clients")
+      .update({
+        birth_year: num("birth_year"),
+        height_in: feet ? Math.round((feet * 12 + (Number.isFinite(inches) ? inches : 0)) * 10) / 10 : null,
+        sex_for_calculations: sex === "male" || sex === "female" ? sex : null,
+      })
+      .eq("id", clientId)
+  );
+  revalidatePath(`/clients/${clientId}/intake`);
+}
+
+// ── Progress ────────────────────────────────────────────────────────────
+
+
+const isoDate = (v: FormDataEntryValue | null) => {
+  const s = String(v || "");
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : new Date().toISOString().slice(0, 10);
+};
+
+export async function addMeasurement(form: FormData) {
+  const { supabase, userId } = await uid();
+  const clientId = String(form.get("client_id"));
+
+  const row: Record<string, number | null> = {};
+  let any = false;
+  for (const f of MEASUREMENT_FIELDS) {
+    const raw = String(form.get(f.key) ?? "").trim();
+    if (!raw) { row[f.key] = null; continue; }
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < f.min || n > f.max) {
+      throw new Error(`${f.label} must be between ${f.min} and ${f.max} ${f.unit}.`);
+    }
+    row[f.key] = n;
+    any = true;
+  }
+  if (!any) throw new Error("Enter at least one measurement.");
+
+  await must(
+    supabase.from("client_measurements").insert({
+      trainer_id: userId,
+      client_id: clientId,
+      measured_on: isoDate(form.get("measured_on")),
+      ...row,
+    })
+  );
+  revalidatePath(`/clients/${clientId}/progress`);
+}
+
+export async function deleteMeasurement(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  await must(supabase.from("client_measurements").delete().eq("id", String(form.get("id"))));
+  revalidatePath(`/clients/${clientId}/progress`);
+}
+
+export async function addCheckin(form: FormData) {
+  const { supabase, userId } = await uid();
+  const clientId = String(form.get("client_id"));
+  const scores: Record<string, number> = {};
+  for (const f of CHECKIN_FIELDS) {
+    const n = Number(form.get(f.key));
+    if (!Number.isInteger(n) || n < 1 || n > 5) throw new Error(`Score ${f.label.toLowerCase()} from 1 to 5.`);
+    scores[f.key] = n;
+  }
+  await must(
+    supabase.from("client_checkins").insert({
+      trainer_id: userId,
+      client_id: clientId,
+      checked_in_on: isoDate(form.get("checked_in_on")),
+      ...scores,
+    })
+  );
+  revalidatePath(`/clients/${clientId}/progress`);
+}
+
+export async function saveNutritionProfile(form: FormData) {
+  const { supabase, userId } = await uid();
+  const clientId = String(form.get("client_id"));
+  const pick = <T extends string>(key: string, allowed: readonly T[]): T => {
+    const v = String(form.get(key));
+    if (!(allowed as readonly string[]).includes(v)) throw new Error(`Choose a valid ${key.replace("_", " ")}.`);
+    return v as T;
+  };
+  const allergens = form.getAll("allergens").map(String);
+  if (allergens.some((a) => !(ALLERGENS as readonly string[]).includes(a))) throw new Error("Unrecognised allergen.");
+  await must(
+    supabase.from("nutrition_profiles").upsert({
+      client_id: clientId,
+      trainer_id: userId,
+      activity_level: pick("activity_level", Object.keys(ACTIVITY_LEVELS)),
+      goal: pick("goal", Object.keys(GOALS)),
+      diet: pick("diet", DIETS),
+      allergens,
+      gluten_free: form.get("gluten_free") === "on",
+      other_allergy: form.get("other_allergy") === "on",
+      severe_allergy: form.get("severe_allergy") === "on",
+    })
+  );
+  revalidatePath(`/clients/${clientId}/nutrition`);
+}
+
+export async function deleteMealPlan(form: FormData) {
+  const { supabase } = await uid();
+  const clientId = String(form.get("client_id"));
+  await must(supabase.from("meal_plans").delete().eq("id", String(form.get("id"))));
+  revalidatePath(`/clients/${clientId}/nutrition`);
+  redirect(`/clients/${clientId}/nutrition`);
 }

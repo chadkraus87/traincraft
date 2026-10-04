@@ -32,10 +32,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Dumbbell className="text-coral" size={20} aria-hidden="true" />
               Coach<span className="text-terracotta">Rhythm</span>
             </Link>
-            <nav className="flex gap-6 text-sm items-center">
+            <nav className="flex flex-wrap justify-end gap-x-6 gap-y-2 text-sm items-center">
               {user ? (
                 <>
                   <Link href="/clients" className="hover:text-terracotta">Clients</Link>
+                  <Link href="/schedule" className="hover:text-terracotta">Schedule</Link>
                   <Link href="/exercises" className="hover:text-terracotta">Exercise library</Link>
                   <Link href="/plans/new" className="hover:text-terracotta">New plan</Link>
                   <Link href="/workouts/new" className="hover:text-terracotta">New workout</Link>

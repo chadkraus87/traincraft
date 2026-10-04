@@ -1,6 +1,29 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { LEGAL_VERSIONS } from "@/lib/legal";
+
+/**
+ * Has this trainer accepted the current versions of every legal document?
+ *
+ * Checked on page load rather than only at signup, which covers three cases
+ * with one mechanism: new accounts, accounts that predate clickwrap, and
+ * everyone after a version bump.
+ */
+export async function hasAcceptedCurrentTerms(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  // ponytail: one indexed query per page render. Cache the accepted version
+  // in a JWT claim if this ever shows up in latency.
+  const { data } = await supabase
+    .from("legal_acceptances")
+    .select("id")
+    .eq("trainer_id", userId)
+    .eq("terms_version", LEGAL_VERSIONS.terms)
+    .eq("privacy_version", LEGAL_VERSIONS.privacy)
+    .eq("dpa_version", LEGAL_VERSIONS.dpa)
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
 
 /**
  * Returns the signed-in user, or redirects to /login.
@@ -14,21 +37,36 @@ import type { User } from "@supabase/supabase-js";
  * requireUserOrThrow, since a redirect from an action is awkward to handle
  * on the client.
  */
-export async function requireUser(): Promise<User> {
+export async function requireUser(opts: { skipTerms?: boolean } = {}): Promise<User> {
   const supabase = await supabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  if (!opts.skipTerms && !(await hasAcceptedCurrentTerms(supabase, user.id))) {
+    redirect("/accept-terms");
+  }
   return user;
 }
 
-/** Server-action variant: throws instead of redirecting. */
+/**
+ * Server-action variant: throws instead of redirecting.
+ *
+ * Terms are enforced here too. Checking them only in requireUser() meant the
+ * gate was page-only: every API route and server action still ran for a
+ * trainer who had never accepted the current versions, which is precisely the
+ * surface that processes client health data. The acceptance record exists to
+ * evidence that they agreed before doing that, so it has to gate the doing.
+ */
 export async function requireUserOrThrow(): Promise<User> {
   const supabase = await supabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not signed in");
+  if (!(await hasAcceptedCurrentTerms(supabase, user.id))) throw new Error(TERMS_REQUIRED);
   return user;
 }
+
+/** Thrown, and returned by API routes, when the current terms aren't accepted. */
+export const TERMS_REQUIRED = "Accept the current Terms, Privacy Policy and DPA before continuing.";

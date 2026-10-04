@@ -42,6 +42,10 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
   poweredByHeader: false,
+  // The legal pages read docs/legal/*.md at request time. Output tracing
+  // can't see a path built at runtime, so without this the files are missing
+  // from the deployed function and the pages 500.
+  outputFileTracingIncludes: { "/legal/[doc]": ["./docs/legal/*.md"] },
   async headers() {
     return [
       {

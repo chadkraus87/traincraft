@@ -15,7 +15,7 @@ body { line-height: 1.5; }
 
 body { @apply bg-paper text-ink font-body antialiased; }
 body {
-  background-image: linear-gradient(rgba(18, 17, 16, 0.6), rgba(18, 17, 16, 0.6)), url('/background-art.png');
+  background-image: linear-gradient(rgba(18, 17, 16, 0.6), rgba(18, 17, 16, 0.6)), url('/background-art.webp');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
@@ -56,3 +56,18 @@ body {
   background-image: radial-gradient(rgba(242, 137, 94, 0.5) 1.5px, transparent 1.5px);
   background-size: 14px 14px;
 }
+
+/* Legal documents rendered from markdown. Scoped to .legal so it can't leak
+   into app UI, and kept plain: these pages are for reading, not skimming. */
+.legal { line-height: 1.65; font-size: 0.95rem; }
+.legal h1 { @apply font-display uppercase tracking-wide text-3xl mb-4; }
+.legal h2 { @apply font-display uppercase tracking-wide text-xl mt-8 mb-3; }
+.legal h3 { @apply font-semibold mt-6 mb-2; }
+.legal p, .legal ul, .legal ol, .legal table, .legal blockquote { margin-bottom: 0.9rem; }
+.legal ul { list-style: disc; padding-left: 1.4rem; }
+.legal ol { list-style: decimal; padding-left: 1.4rem; }
+.legal a { text-decoration: underline; }
+.legal blockquote { border-left: 3px solid rgba(128,128,128,0.5); padding-left: 0.9rem; opacity: 0.9; }
+.legal code { font-size: 0.85em; white-space: pre-wrap; }
+.legal table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.legal th, .legal td { border: 1px solid rgba(128,128,128,0.35); padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }

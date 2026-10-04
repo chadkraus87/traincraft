@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { planToPdf } from "@/lib/pdf";
 import { getTrainerBrand } from "@/lib/brand-server";
+import { loadProgrammingGate } from "@/lib/intake/screening";
 import type { PlanJson, QaReport } from "@/lib/types";
 import { deriveQaForStoredPlan, isDeliverable } from "@/lib/ai/plan-qa";
+import { hasAcceptedCurrentTerms, TERMS_REQUIRED } from "@/lib/auth";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,12 +18,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
+  // Terms gate, same as the pages. A route that processes client health data
+  // must not run for a trainer who hasn't accepted the current versions.
+  if (!(await hasAcceptedCurrentTerms(supabase, user.id))) {
+    return NextResponse.json({ error: TERMS_REQUIRED, termsRequired: true }, { status: 403 });
+  }
+
   const { data: plan } = await supabase
     .from("workout_plans")
     .select("*, clients(*)")
     .eq("id", id)
     .single();
   if (!plan) return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+
+  // A plan generated while the client was cleared must not be handed over
+  // after their screening lapses or reports symptoms — sending it is the
+  // moment the plan reaches the person the gate protects.
+  const screening = await loadProgrammingGate(supabase, plan.client_id);
+  if (!screening.allowed) {
+    return NextResponse.json({ error: screening.reasons.join(" ") }, { status: 409 });
+  }
 
   // QA gates delivery, and the verdict is recomputed here rather than read
   // off the stored status. Two reasons: a stored "final" can be stale (the

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx tests/safety.test.ts && tsx tests/pdf.test.tsx && tsx tests/builder-guard.test.ts && tsx tests/observability.test.ts",
+    "test": "tsx tests/safety.test.ts && tsx tests/pdf.test.tsx && tsx tests/builder-guard.test.ts && tsx tests/observability.test.ts && tsx tests/intake.test.ts && tsx tests/nutrition.test.ts",
     "test:db": "tsx tests/migrations.test.ts && tsx tests/rls.test.ts && tsx tests/coverage.test.ts",
     "test:e2e": "playwright test",
     "check:migrations": "tsx tests/check-migrations-complete.ts"
@@ -19,7 +19,8 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.0",
     "lucide-react": "^1.26.0",
-    "next": "^16.3.1",
+    "marked": "^18.0.13",
+    "next": "^16.3.3",
     "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

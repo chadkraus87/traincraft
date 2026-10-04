@@ -26,7 +26,7 @@ export default async function OnboardingLimitations({ params }: { params: Promis
             {(limitations ?? []).map((l) => (
               <li key={l.id} className="text-sm">
                 {LIMITATION_LABELS[l.tag as keyof typeof LIMITATION_LABELS] ?? l.tag}
-                {l.detail && <span className="text-steel"> — {l.detail}</span>}
+                {l.side && <span className="text-steel capitalize"> — {l.side} side</span>}
               </li>
             ))}
           </ul>
@@ -36,7 +36,12 @@ export default async function OnboardingLimitations({ params }: { params: Promis
           <select name="tag" className="input">
             {LIMITATION_TAGS.map((t) => <option key={t} value={t}>{LIMITATION_LABELS[t]}</option>)}
           </select>
-          <input name="detail" className="input" placeholder="Context (e.g. left side, flares with overhead work)" />
+          <select name="side" className="input" defaultValue="">
+            <option value="">Side — not applicable</option>
+            <option value="left">Left side</option>
+            <option value="right">Right side</option>
+            <option value="bilateral">Both sides</option>
+          </select>
           <button className="btn-ghost w-full justify-center">Add limitation</button>
         </form>
       </div>

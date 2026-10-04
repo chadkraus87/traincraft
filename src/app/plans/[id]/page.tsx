@@ -9,6 +9,7 @@ import QaReportEditor from "@/components/QaReportEditor";
 import PlanEditor from "@/components/PlanEditor";
 import type { PlanJson, QaCheck, QaReport } from "@/lib/types";
 import { deriveQaForStoredPlan, isDeliverable } from "@/lib/ai/plan-qa";
+import { loadProgrammingGate } from "@/lib/intake/screening";
 import { QA_CHECK_LABELS } from "@/lib/ai/validate";
 
 export default async function PlanView({ params }: { params: Promise<{ id: string }> }) {
@@ -56,7 +57,8 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
   // were. A newly-logged injury invalidates it, so a regression blocks
   // delivery regardless of what the stored report says. Same helper the PDF
   // route uses, so the URL can't be used to route around this.
-  const deliverable = isDeliverable(qa, liveQa);
+  const intake = await loadProgrammingGate(supabase, client.id);
+  const deliverable = intake.allowed && isDeliverable(qa, liveQa);
 
   const { data: deliveries } = await supabase
     .from("deliveries")
@@ -111,8 +113,14 @@ export default async function PlanView({ params }: { params: Promise<{ id: strin
             />
           ) : (
             <span className="text-xs text-[#F4C77A] max-w-[22rem]">
-              Sending is unavailable until this plan clears QA — review the flagged checks below and
-              confirm it&apos;s safe to send.
+              {intake.allowed ? (
+                <>Sending is unavailable until this plan clears QA — review the flagged checks below and confirm it&apos;s safe to send.</>
+              ) : (
+                <>
+                  Sending is unavailable: {intake.reasons.join(" ")}{" "}
+                  <a href={`/clients/${client.id}/intake`} className="underline">Open intake →</a>
+                </>
+              )}
             </span>
           )}
           {!planRow.is_single_workout && <SaveTemplateButton planId={planRow.id} />}
