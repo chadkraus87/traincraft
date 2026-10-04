@@ -362,6 +362,21 @@ async function main() {
     await rejects(db, `insert into nutrition_profiles (client_id, trainer_id, activity_level, goal) values ($1, $2, 'light', 'gain')`, [clientA, TRAINER_B]),
     "trainer B cannot write A's client's nutrition profile", "trainer B wrote another trainer's client's nutrition profile");
 
+  // ── Nutrition state policy (0036) ─────────────────────────────────────
+  await actAs(db, TRAINER_A);
+  const postures = await db.query("select posture, count(*)::int as n from nutrition_state_policy group by posture");
+  check(postures.rows.length === 1 && postures.rows[0].posture === "unreviewed" && postures.rows[0].n >= 50,
+    "every state ships unreviewed, which blocks",
+    `postures: ${JSON.stringify(postures.rows)}`);
+  check(
+    await rejects(db, "update nutrition_state_policy set posture = 'permitted' where state = 'CA'") ||
+      (await db.query("select posture from nutrition_state_policy where state = 'CA'")).rows[0].posture === "unreviewed",
+    "a trainer cannot mark their own state permitted",
+    "a trainer changed the state policy through the API");
+  check(
+    await rejects(db, "insert into nutrition_state_policy (state, posture) values ('ZZ', 'permitted')"),
+    "a trainer cannot add a state policy row", "a trainer inserted a state policy");
+
   // ── Export completeness ───────────────────────────────────────────────
   // The export is a published promise and a client's only route to the health
   // data held about them, so a new tenant table must be an explicit decision.

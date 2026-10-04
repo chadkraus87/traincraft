@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
+import { US_STATES } from "@/lib/nutrition/gates";
 
 /**
  * Saves the signed-in trainer's branding.
@@ -28,6 +29,13 @@ export async function saveTrainerProfile(form: FormData): Promise<SaveResult> {
     return v.length > 0 ? v.slice(0, 120) : null;
   };
 
+  const rawState = String(form.get("practice_state") ?? "").trim().toUpperCase();
+  if (rawState && !(US_STATES as readonly string[]).includes(rawState)) {
+    return { ok: false, message: "That isn't a US state or territory we recognise." };
+  }
+  const practiceState = rawState || null;
+  const credential = form.get("nutrition_credential") === "on";
+
   const { error } = await supabase.from("trainer_profiles").upsert(
     {
       trainer_id: user.id,
@@ -35,6 +43,11 @@ export async function saveTrainerProfile(form: FormData): Promise<SaveResult> {
       coach_name: clean("coach_name"),
       credentials: clean("credentials"),
       phone: clean("phone"),
+      practice_state: practiceState,
+      nutrition_credential: credential,
+      // Dated so there is a record of when the claim was made, not just that
+      // it was. Cleared along with the claim if it is ever unticked.
+      nutrition_credential_attested_on: credential ? new Date().toISOString().slice(0, 10) : null,
     },
     { onConflict: "trainer_id" }
   );

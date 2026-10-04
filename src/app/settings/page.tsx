@@ -16,7 +16,7 @@ export default async function Settings({
 
   const { data: profile } = await supabase
     .from("trainer_profiles")
-    .select("business_name, coach_name, credentials, phone")
+    .select("business_name, coach_name, credentials, phone, practice_state, nutrition_credential")
     .eq("trainer_id", user.id)
     .maybeSingle();
 
