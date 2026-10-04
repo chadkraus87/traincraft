@@ -15,7 +15,7 @@ body { line-height: 1.5; }
 
 body { @apply bg-paper text-ink font-body antialiased; }
 body {
-  background-image: linear-gradient(rgba(18, 17, 16, 0.6), rgba(18, 17, 16, 0.6)), url('/background-art.png');
+  background-image: linear-gradient(rgba(18, 17, 16, 0.6), rgba(18, 17, 16, 0.6)), url('/background-art.webp');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
