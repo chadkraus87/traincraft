@@ -10,7 +10,8 @@
     "test": "tsx tests/safety.test.ts && tsx tests/pdf.test.tsx && tsx tests/builder-guard.test.ts && tsx tests/observability.test.ts && tsx tests/intake.test.ts && tsx tests/nutrition.test.ts",
     "test:db": "tsx tests/migrations.test.ts && tsx tests/rls.test.ts && tsx tests/coverage.test.ts",
     "test:e2e": "playwright test",
-    "check:migrations": "tsx tests/check-migrations-complete.ts"
+    "check:migrations": "tsx tests/check-migrations-complete.ts",
+    "verify:meal-plan": "tsx scripts/verify-meal-plan.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

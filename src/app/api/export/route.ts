@@ -1,16 +1,16 @@
 /**
- * GET /api/export · downloads a full JSON backup of everything this
- * trainer owns: clients, limitations, equipment, plans (including plan
- * content + QA reports), exercise logs, notes, plan templates, and any
- * custom exercises they've added (not the shared base library — that's
- * identical for every deployment and reconstructable from the seed
- * migrations, no need to include it in a personal backup).
+ * GET /api/export · downloads a full JSON backup of everything this trainer
+ * owns. The table list lives in src/lib/export-tables.ts and is checked by the
+ * RLS suite against every tenant-scoped table, because this export backs a
+ * published promise and is a client's only route to the health data held
+ * about them. RLS scopes every query to the caller.
  * JSON rather than CSV deliberately — several tables have array/nested
  * fields (limitation tags, plan session structure) that don't represent
  * cleanly in flat CSV rows without lossy flattening.
  */
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import { EXPORT_TABLES, EXPORT_EXCLUDED } from "@/lib/export-tables";
 
 export async function GET() {
   const supabase = await supabaseServer();
@@ -19,40 +19,31 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const [
-    clients,
-    limitations,
-    equipment,
-    plans,
-    logs,
-    notes,
-    templates,
-    customExercises,
-    deliveries,
-  ] = await Promise.all([
-    supabase.from("clients").select("*"),
-    supabase.from("client_limitations").select("*"),
-    supabase.from("client_equipment").select("*"),
-    supabase.from("workout_plans").select("*"),
-    supabase.from("exercise_logs").select("*"),
-    supabase.from("client_notes").select("*"),
-    supabase.from("plan_templates").select("*"),
-    supabase.from("exercises").select("*").eq("trainer_id", user.id),
-    supabase.from("deliveries").select("*"),
-  ]);
+  // One query per exported table, so a new table is added in one place and
+  // the test that checks for omissions can see the list.
+  const results = await Promise.all(EXPORT_TABLES.map((t) => supabase.from(t).select("*")));
+  const failed = EXPORT_TABLES.filter((_, i) => results[i].error);
+  if (failed.length > 0) {
+    // A partial backup that looks complete is worse than no backup: a trainer
+    // would keep it, delete the account, and discover the gap too late.
+    return NextResponse.json(
+      { error: `Could not export ${failed.join(", ")}. Nothing was downloaded — try again.` },
+      { status: 500 }
+    );
+  }
+
+  const { data: customExercises, error: exercisesError } = await supabase
+    .from("exercises").select("*").eq("trainer_id", user.id);
+  if (exercisesError) {
+    return NextResponse.json({ error: "Could not export your custom exercises. Nothing was downloaded — try again." }, { status: 500 });
+  }
 
   const backup = {
     exported_at: new Date().toISOString(),
     trainer_id: user.id,
-    clients: clients.data ?? [],
-    client_limitations: limitations.data ?? [],
-    client_equipment: equipment.data ?? [],
-    workout_plans: plans.data ?? [],
-    exercise_logs: logs.data ?? [],
-    client_notes: notes.data ?? [],
-    plan_templates: templates.data ?? [],
-    custom_exercises: customExercises.data ?? [],
-    deliveries: deliveries.data ?? [],
+    ...Object.fromEntries(EXPORT_TABLES.map((t, i) => [t, results[i].data ?? []])),
+    custom_exercises: customExercises ?? [],
+    excluded_tables: EXPORT_EXCLUDED,
   };
 
   const filename = `coachrhythm-backup-${new Date().toISOString().slice(0, 10)}.json`;

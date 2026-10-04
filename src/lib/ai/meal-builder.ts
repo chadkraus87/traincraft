@@ -82,6 +82,9 @@ export function mealName(index: number, count: number): string {
 }
 
 /** Exported so tests can assert nothing identifying reaches the prompt. */
+/** Protein per 100 kcal — how much protein a food buys per unit of budget. */
+const proteinDensity = (f: Food) => (Number(f.kcal) > 0 ? (Number(f.protein_g) / Number(f.kcal)) * 100 : 0);
+
 export function mealPrompt(i: MealBuildInput): string {
   const poolLines = i.pool
     .map((f) =>
@@ -92,15 +95,28 @@ export function mealPrompt(i: MealBuildInput): string {
 DIET: ${i.diet === "none" ? "no restriction" : i.diet}
 PLAN: ${i.days} day${i.days > 1 ? "s" : ""}, exactly ${i.mealsPerDay} meals per day, days numbered 1-${i.days}.
 ${i.feedback ? `\nPREVIOUS ATTEMPT FAILED QA — fix these exactly: ${i.feedback}\n` : ""}
+MOST PROTEIN-EFFICIENT FOODS in this pool (most protein per calorie). Anchor every meal on one of these and size it FIRST, then spend the remaining calories on everything else — this is the only way to reach the protein target without overshooting calories:
+${i.pool.filter((f) => proteinDensity(f) >= 8).sort((a, b) => proteinDensity(b) - proteinDensity(a)).slice(0, 12)
+  .map((f) => `  ${f.fdc_id} | ${f.name} | ${Math.round(proteinDensity(f) * 10) / 10} g protein per 100 kcal | max ${Number(f.max_serving_g)} g`).join("\n")}
+
 FOOD POOL (fdc_id | name | category | portion bounds | nutrition). Use ONLY these fdc_ids:
 ${poolLines}`;
 }
 
+// These mirror the deterministic QA checks. The model is told the rules it
+// will be judged against, because a plan that fails QA becomes a draft the
+// trainer can't send — and a feature that always drafts teaches trainers to
+// ignore the warning, which is its own harm.
 const SYSTEM = `You build practical, everyday meal plans for a personal trainer's healthy adult client.
 - Use only foods from the pool, referenced by fdc_id. Never invent a food.
 - Each day should land within 5% of the calorie target and meet the protein target. Add up each day using the per-100 g values before submitting.
-- Keep every portion at or below its max. Build meals people actually eat together; spread protein across meals.
-- Vary foods across days. Use only the listed foods — no sauces, toppings or extras.
+- Protein is the hardest constraint. Pick each meal's protein source first and size it to reach the daily protein target, then fill the remaining calories. A plan that misses protein is rejected.
+- Keep every portion at or below its max. Build meals people actually eat together.
+- Every day needs at least two vegetables and at least one fruit.
+- Keep each meal between 10% and 50% of the day's calories, and spread protein across meals.
+- Stay under 2300 mg sodium a day, keep saturated fat under 10% of calories, and keep sweeteners (honey) under 10% of calories.
+- Include enough fibre: at least 14 g per 1000 kcal, and no more than 70 g in a day.
+- Use at least six different foods every day, and vary them across days. Only the listed foods — no sauces, toppings or extras.
 Submit the plan with the submit_meal_plan tool.`;
 
 export async function buildMealPlan(i: MealBuildInput): Promise<MealPlanJson> {

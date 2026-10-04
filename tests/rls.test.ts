@@ -18,6 +18,7 @@
  * the worst failure this codebase can have. These assertions fail the build.
  */
 import EmbeddedPostgres from "embedded-postgres";
+import { EXPORT_TABLES, EXPORT_EXCLUDED } from "../src/lib/export-tables";
 import { readFileSync, readdirSync } from "fs";
 
 // Structural type instead of `import type { Client } from "pg"` — pg ships
@@ -328,6 +329,17 @@ async function main() {
   check(
     await rejects(db, `update nutrition_profiles set allergens = '{mustard}' where client_id = $1`, [clientA]),
     "an allergen outside the tracked nine can't be stored", "an unmatchable allergen string was stored");
+  check(
+    await rejects(db, `update nutrition_profiles set medications = '{aspirin}' where client_id = $1`, [clientA]),
+    "a medication outside the screened list can't be stored", "an unscreenable medication string was stored");
+  check(
+    await rejects(db, `update nutrition_profiles set life_stage = 'maybe' where client_id = $1`, [clientA]),
+    "an invalid life stage is rejected", "an invalid life_stage was stored");
+  const unanswered = await db.query("select life_stage, medications, other_medication from nutrition_profiles where client_id = $1", [clientA]);
+  check(
+    unanswered.rows[0].life_stage === null && unanswered.rows[0].medications === null && unanswered.rows[0].other_medication === null,
+    "medical screening columns default to null, not to a permissive answer",
+    `got ${JSON.stringify(unanswered.rows[0])}`);
   await db.query(
     `insert into meal_plans (trainer_id, client_id, title, days, meals_per_day, targets, plan, qa_report, status)
      values ($1, $2, 'MP', 3, 4, '{}', '{}', '{}', 'final')`, [TRAINER_A, clientA]);
@@ -349,6 +361,25 @@ async function main() {
   check(
     await rejects(db, `insert into nutrition_profiles (client_id, trainer_id, activity_level, goal) values ($1, $2, 'light', 'gain')`, [clientA, TRAINER_B]),
     "trainer B cannot write A's client's nutrition profile", "trainer B wrote another trainer's client's nutrition profile");
+
+  // ── Export completeness ───────────────────────────────────────────────
+  // The export is a published promise and a client's only route to the health
+  // data held about them, so a new tenant table must be an explicit decision.
+  const tenantTables = await admin.query(`
+    select table_name from information_schema.columns
+    where table_schema = 'public' and column_name = 'trainer_id'
+    order by table_name`);
+  const unaccounted = tenantTables.rows
+    .map((r: { table_name: string }) => r.table_name)
+    .filter((t: string) => !(EXPORT_TABLES as readonly string[]).includes(t) && !(t in EXPORT_EXCLUDED));
+  check(unaccounted.length === 0,
+    "every tenant-scoped table is either exported or explicitly excluded",
+    `not accounted for in src/lib/export-tables.ts: ${unaccounted.join(", ")}`);
+  const exportedMissing = (EXPORT_TABLES as readonly string[])
+    .filter((t) => !tenantTables.rows.some((r: { table_name: string }) => r.table_name === t));
+  check(exportedMissing.length === 0,
+    "every table named in the export actually exists and is tenant-scoped",
+    `named but not found: ${exportedMissing.join(", ")}`);
 
   // ── Retention purge (0028) ────────────────────────────────────────────
   await admin.query(

@@ -6,7 +6,7 @@ import { requireUserOrThrow } from "@/lib/auth";
 import { isKnownLimitationTag } from "@/lib/safety/rules";
 import type { PlanJson } from "@/lib/types";
 import { MEASUREMENT_FIELDS, CHECKIN_FIELDS } from "@/lib/progress";
-import { ALLERGENS, DIETS } from "@/lib/nutrition/gates";
+import { ALLERGENS, DIETS, MEDICATIONS, LIFE_STAGES } from "@/lib/nutrition/gates";
 import { ACTIVITY_LEVELS, GOALS } from "@/lib/nutrition/macros";
 
 /**
@@ -455,6 +455,13 @@ export async function saveNutritionProfile(form: FormData) {
   };
   const allergens = form.getAll("allergens").map(String);
   if (allergens.some((a) => !(ALLERGENS as readonly string[]).includes(a))) throw new Error("Unrecognised allergen.");
+  const medications = form.getAll("medications").map(String);
+  if (medications.some((m) => !(MEDICATIONS as readonly string[]).includes(m))) throw new Error("Unrecognised medication.");
+  // The medication and pregnancy questions are only answered when the trainer
+  // ticks the box saying they asked. Without it the columns stay null, and the
+  // gate treats null as unsafe — a saved form must not be able to mean "no"
+  // by default on a question nobody put to the client.
+  const screeningDone = form.get("medical_screening_done") === "on";
   await must(
     supabase.from("nutrition_profiles").upsert({
       client_id: clientId,
@@ -466,6 +473,9 @@ export async function saveNutritionProfile(form: FormData) {
       gluten_free: form.get("gluten_free") === "on",
       other_allergy: form.get("other_allergy") === "on",
       severe_allergy: form.get("severe_allergy") === "on",
+      life_stage: screeningDone ? pick("life_stage", LIFE_STAGES) : null,
+      medications: screeningDone ? medications : null,
+      other_medication: screeningDone ? form.get("other_medication") === "on" : null,
     })
   );
   revalidatePath(`/clients/${clientId}/nutrition`);
