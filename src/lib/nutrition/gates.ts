@@ -161,7 +161,14 @@ export function nutritionGate(i: NutritionGateInput): NutritionGate {
     }
   }
 
-  if (i.age !== null && i.age < 18) {
+  // Null fails closed, like every other unanswered health question here. In
+  // practice hasBasics already blocks a missing age, but this gate must not
+  // depend on that: age unknown is not age over 18, and this is the one
+  // population where getting it wrong is worst.
+  if (i.age === null) {
+    block({ deficit: true, mealPlans: true },
+      "Add this client's birth year. Without it there's no way to tell whether they're a minor.");
+  } else if (i.age < 18) {
     // Targets are blocked too, not just the deficit. Mifflin-St Jeor is an
     // adult equation that doesn't model growth, so the number would be wrong
     // anyway — and putting a calorie figure in front of an adolescent is the
