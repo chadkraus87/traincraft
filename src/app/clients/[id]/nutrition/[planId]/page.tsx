@@ -58,6 +58,19 @@ export default async function MealPlanView({ params }: { params: Promise<{ id: s
         </ul>
       </div>
 
+      {(qa?.advisories ?? row.qa_report.advisories ?? []).length > 0 && (
+        <div className="card border-l-4 border-signal">
+          <h2 className="display text-lg mb-1">Worth telling the client</h2>
+          <p className="text-xs text-steel mb-2">
+            These don&apos;t block the plan — a plan built from whole foods can&apos;t always reach every
+            reference intake. They print on the PDF so the client sees them too.
+          </p>
+          <ul className="text-sm space-y-1 list-disc pl-5">
+            {(qa?.advisories ?? row.qa_report.advisories ?? []).map((a) => <li key={a}>{a}</li>)}
+          </ul>
+        </div>
+      )}
+
       <p className="flag text-sm">
         Foods were screened against the client&apos;s recorded allergies, but brands differ in ingredients and
         cross-contact. The PDF tells the client to check every label.

@@ -161,6 +161,7 @@ export async function mealPlanToPdf(
   title: string,
   days: MealPdfDay[],
   screenedFor: string[],
+  advisories: string[],
   brand: TrainerBrand
 ) {
   const doc = (
@@ -187,6 +188,13 @@ export async function mealPlanToPdf(
               don&apos;t eat anything you&apos;re unsure about.
             </Text>
           </View>
+
+          {advisories.length > 0 && (
+            <View style={s.prog} wrap={false}>
+              <Text style={s.boxTitle}>Worth knowing about this plan</Text>
+              {advisories.map((a, i) => <Text key={i} style={{ marginBottom: 2 }}>• {a}</Text>)}
+            </View>
+          )}
 
           {days.map((d) => (
             <View key={d.day} wrap={false}>

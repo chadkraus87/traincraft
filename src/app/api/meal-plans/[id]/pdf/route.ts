@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const row = data as MealPlanRow;
 
   // Same live check as the page: status, QA against the current profile, and the gate.
-  const { ctx, library, deliverable, reasons } = await liveMealPlanCheck(supabase, row);
+  const { ctx, library, qa, deliverable, reasons } = await liveMealPlanCheck(supabase, row);
   if (!deliverable || !ctx.client || !ctx.profile) {
     return NextResponse.json({ error: reasons.join(" ") }, { status: 409 });
   }
@@ -47,7 +47,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   ];
 
   const brand = await getTrainerBrand(user.id);
-  const buf = await mealPlanToPdf(ctx.client.full_name, row.title, days, screenedFor, brand);
+  const buf = await mealPlanToPdf(ctx.client.full_name, row.title, days, screenedFor, qa?.advisories ?? [], brand);
   return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/pdf",

@@ -97,10 +97,16 @@ check("an incomplete screening blocks everything", (() => { const r = g({ screen
   const food = (id: string, o: Partial<Food> = {}): Food => ({
     id, fdc_id: Number(id.replace(/\D/g, "")) || 1, name: id, category: "protein", animal_class: "plant",
     serving_g: 100, serving_desc: "100 g", max_serving_g: 300, allergens: [], contains_gluten: false,
-    kcal: 100, protein_g: 10, fat_g: 3, carbs_g: 8, is_active: true, ...o,
+    kcal: 100, protein_g: 10, fat_g: 3, carbs_g: 8,
+    // Nutrient values a balanced day would have, so these fixtures exercise
+    // the allergen and portion logic rather than tripping the adequacy checks.
+    fiber_g: 3, sodium_mg: 50, sat_fat_g: 0.3, sugars_g: 1, calcium_mg: 150, iron_mg: 2,
+    magnesium_mg: 60, potassium_mg: 500, zinc_mg: 1.5, b12_ug: 0.5, folate_ug: 70, vit_d_ug: 2.5,
+    is_active: true, ...o,
   });
   const lib: Food[] = [
-    food("f1"), food("f2"), food("f3"), food("f4"), food("f5"), food("f6"),
+    food("f1"), food("f2"), food("f3"),
+    food("f4", { category: "vegetable" }), food("f5", { category: "vegetable" }), food("f6", { category: "fruit" }),
     food("peanut7", { allergens: ["peanut"] }),
     food("beef8", { animal_class: "meat" }),
     food("oats9", { contains_gluten: true, category: "grain" }),
@@ -272,6 +278,83 @@ check("a minor gets no calorie targets at all", !g({ age: 16 }).targets);
   check("a client on no medicines and not pregnant is unaffected",
     (() => { const r = withProfile({ life_stage: "none", medications: [], other_medication: false });
       return r.targets && r.deficit && r.mealPlans; })());
+}
+
+// ── Nutritional adequacy checks ─────────────────────────────────────────
+{
+  // A "typical" food: nutrient-dense enough that a plain day passes, so each
+  // test below isolates the one thing it is about.
+  const mk = (id: string, o: Partial<Food> = {}): Food => ({
+    id, fdc_id: Math.abs(id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)), name: id,
+    category: "protein", animal_class: "plant", serving_g: 100, serving_desc: "x", max_serving_g: 500,
+    allergens: [], contains_gluten: false, kcal: 100, protein_g: 10, fat_g: 3, carbs_g: 8,
+    fiber_g: 3, sodium_mg: 50, sat_fat_g: 0.3, sugars_g: 1, calcium_mg: 150, iron_mg: 2,
+    magnesium_mg: 60, potassium_mg: 500, zinc_mg: 1.5, b12_ug: 0.5, folate_ug: 70, vit_d_ug: 2.5,
+    is_active: true, ...o,
+  });
+  const veg = (id: string, o: Partial<Food> = {}) => mk(id, { category: "vegetable", ...o });
+  const fruit = (id: string, o: Partial<Food> = {}) => mk(id, { category: "fruit", ...o });
+  const lib = [mk("p1"), mk("p2"), veg("v1"), veg("v2"), fruit("fr1"), mk("p3")];
+  const prof: NutritionProfile = { activity_level: "light", goal: "maintain", diet: "none", allergens: [],
+    gluten_free: false, other_allergy: false, severe_allergy: false, life_stage: "none", medications: [], other_medication: false };
+  const T = { calories: 1200, proteinG: 110, minCalories: 0 };
+  // 6 foods x 200 g x 100 kcal/100 g = 1200 kcal, 120 g protein, 2 veg + 1 fruit.
+  const day = (ids: string[], grams = 200) => ({ name: "M", items: ids.map((food_id) => ({ food_id, grams })) });
+  const ok: MealPlanJson = { days: [{ day: 1, meals: [day(["p1", "p2", "v1"]), day(["v2", "fr1", "p3"])] }] };
+  const run = (plan: MealPlanJson, library = lib) => validateMealPlan(plan, library, prof, T, 1, 2, 1);
+  const named = (plan: MealPlanJson, name: string, library = lib) => run(plan, library).checks.find((c) => c.name === name);
+
+  check("adequacy: a balanced day passes every check", run(ok).passed,
+    run(ok).checks.filter((c) => !c.pass).map((c) => `${c.name}: ${c.detail}`).join(" | "));
+
+  // Each limit, breached one at a time.
+  const salty = lib.map((f) => f.id === "p1" ? { ...f, sodium_mg: 1200 } : f);
+  check("adequacy: sodium over 2300 mg fails", named(ok, "sodium", salty)?.pass === false);
+  const fatty = lib.map((f) => f.id === "p1" ? { ...f, sat_fat_g: 8 } : f);
+  check("adequacy: saturated fat at or over 10% of energy fails", named(ok, "saturated_fat", fatty)?.pass === false);
+  const sweet = lib.map((f) => f.id === "p3" ? { ...f, category: "sweetener" } : f);
+  check("adequacy: sweeteners over 10% of energy fail", named(ok, "sweeteners", sweet)?.pass === false);
+  const lowFiber = lib.map((f) => ({ ...f, fiber_g: 0.2 }));
+  check("adequacy: too little fibre fails", named(ok, "fiber", lowFiber)?.pass === false);
+  const hiFiber = lib.map((f) => ({ ...f, fiber_g: 30 }));
+  check("adequacy: too much fibre fails", named(ok, "fiber", hiFiber)?.pass === false);
+
+  const noVeg: MealPlanJson = { days: [{ day: 1, meals: [day(["p1", "p2", "p3"]), day(["p1", "p2", "p3"])] }] };
+  check("adequacy: a day with no vegetables fails", named(noVeg, "food_groups")?.pass === false);
+  check("adequacy: a day with no fruit fails",
+    named({ days: [{ day: 1, meals: [day(["p1", "v1", "v2"]), day(["p2", "p3", "v1"])] }] }, "food_groups")?.pass === false);
+
+  const lopsided: MealPlanJson = { days: [{ day: 1, meals: [
+    { name: "Big", items: [{ food_id: "p1", grams: 1000 }, { food_id: "v1", grams: 100 }, { food_id: "v2", grams: 100 }] },
+    { name: "Tiny", items: [{ food_id: "fr1", grams: 20 }] }] }] };
+  check("adequacy: one meal carrying the whole day fails", named(lopsided, "meal_balance")?.pass === false);
+
+  // Fail closed: a food the dataset has no value for must not read as zero.
+  const unknownSodium = lib.map((f) => f.id === "p1" ? { ...f, sodium_mg: null } : f);
+  check("adequacy: a food with no sodium value fails the check, not passes it",
+    named(ok, "sodium", unknownSodium)?.pass === false);
+  // Fibre is the deliberate exception: a food with no listed fibre (shrimp,
+  // tempeh) must stay usable, with the gap surfaced as an advisory.
+  const unknownFiber = lib.map((f) => f.id === "p1" ? { ...f, fiber_g: null } : f);
+  check("adequacy: a food with no fibre value doesn't disable the plan", named(ok, "fiber", unknownFiber)?.pass === true);
+  check("adequacy: the missing fibre value is surfaced as an advisory",
+    (run(ok, unknownFiber).advisories ?? []).some((a) => /Fibre is understated/.test(a)));
+  const stillTooLittle = lib.map((f) => ({ ...f, fiber_g: f.id === "p1" ? null : 0.2 }));
+  check("adequacy: known fibre below the floor still fails when another value is missing",
+    named(ok, "fiber", stillTooLittle)?.pass === false);
+
+  // Advisories: reported, never blocking.
+  const lowB12 = lib.map((f) => ({ ...f, b12_ug: 0 }));
+  const lowRep = run(ok, lowB12);
+  check("advisories: a B12 shortfall is reported", (lowRep.advisories ?? []).some((a) => /B12/.test(a)));
+  check("advisories: a B12 shortfall does NOT block the plan", lowRep.passed, JSON.stringify(lowRep.advisories));
+  check("advisories: plant-only plans are told to supplement",
+    (lowRep.advisories ?? []).some((a) => /supplement|fortified/i.test(a)));
+  const unknownB12 = lib.map((f) => f.id === "p1" ? { ...f, b12_ug: null } : f);
+  check("advisories: an unknown value is reported as unknown, not as a shortfall",
+    (run(ok, unknownB12).advisories ?? []).some((a) => /can't be totalled/.test(a)));
+  check("advisories: a nutrient that meets the reference isn't mentioned",
+    !(run(ok).advisories ?? []).some((a) => /Potassium/.test(a)), JSON.stringify(run(ok).advisories));
 }
 
 console.log(failures === 0 ? "\nALL NUTRITION TESTS PASSED" : `\n${failures} FAILURES`);

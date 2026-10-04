@@ -55,6 +55,23 @@ export async function POST(req: Request) {
   if (foodsError) return NextResponse.json({ error: "Couldn't load the food library. Try again." }, { status: 500 });
   const library = (foods ?? []) as Food[];
   const pool = screenFoods(library, profile);
+  // Can this pool actually build an adequate day? A multi-allergy vegan
+  // screen can leave a pool that passes the size check and still has no
+  // vegetables or no dense protein, which surfaces to the trainer as a
+  // mysterious draft rather than an explanation.
+  const have = (test: (f: Food) => boolean) => pool.filter(test).length;
+  const shortfalls = [
+    ...(have((f) => Number(f.protein_g) >= 10) < 2 ? ["dense protein sources"] : []),
+    ...(have((f) => f.category === "vegetable") < 3 ? ["vegetables"] : []),
+    ...(have((f) => f.category === "fruit") < 2 ? ["fruit"] : []),
+    ...(have((f) => f.category === "fat") < 1 ? ["fats"] : []),
+  ];
+  if (shortfalls.length > 0) {
+    return NextResponse.json(
+      { error: `After screening for this client's allergies and diet, the food library doesn't have enough ${shortfalls.join(", ")} to build a balanced plan. Build meals with them directly.` },
+      { status: 409 }
+    );
+  }
   if (pool.length < 15) {
     return NextResponse.json(
       { error: `Only ${pool.length} foods in the library fit this client's allergies and diet — too few to build a varied plan. Build meals with them directly.` },
