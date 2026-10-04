@@ -82,10 +82,32 @@ export function calculateTargets(i: MacroInput): MacroTargets {
   }
 
   // Protein by body weight: higher in a deficit to preserve lean mass.
-  const proteinG = kg * (goal === "lose" ? 2.0 : 1.8);
+  //
+  // Capped at 35% of energy, the AMDR upper bound. Dosing on actual body
+  // weight alone is fine for an average client and wrong at the top of the
+  // range: at BMI 40 it prescribed 47% of energy as protein, and at 180 kg it
+  // consumed the whole calorie budget and drove carbohydrate to ~2 g/day — a
+  // ketogenic prescription nobody chose, below the 130 g RDA.
+  let proteinG = Math.min(kg * (goal === "lose" ? 2.0 : 1.8), (calories * 0.35) / 4);
   // Fat at ~28% of energy, never below 0.6 g/kg for hormonal health.
-  const fatG = Math.max((calories * 0.28) / 9, kg * 0.6);
-  const carbsG = Math.max(0, (calories - proteinG * 4 - fatG * 9) / 4);
+  let fatG = Math.max((calories * 0.28) / 9, kg * 0.6);
+
+  // Carbohydrate floor: the 130 g/day RDA, or 45% of energy on a small
+  // target, whichever is lower. Protein gives way first (down to 1.2 g/kg,
+  // the sarcopenia-prevention floor), then fat (down to its own 0.6 g/kg
+  // floor). If both floors bind, the target is reported as-is rather than
+  // silently returning macros that don't sum to it.
+  const carbFloor = Math.min(130, (calories * 0.45) / 4);
+  const carbsFrom = (p: number, f: number) => (calories - p * 4 - f * 9) / 4;
+  if (carbsFrom(proteinG, fatG) < carbFloor) {
+    proteinG = Math.max(kg * 1.2, Math.min(proteinG, (calories - carbFloor * 4 - fatG * 9) / 4));
+    if (carbsFrom(proteinG, fatG) < carbFloor) {
+      fatG = Math.max(kg * 0.6, Math.min(fatG, (calories - carbFloor * 4 - proteinG * 4) / 9));
+    }
+    adjusted = true;
+    notes.push("Protein and fat were trimmed to leave room for a minimum carbohydrate intake.");
+  }
+  const carbsG = Math.max(0, carbsFrom(proteinG, fatG));
 
   const round = (n: number, step: number) => Math.round(n / step) * step;
   return {

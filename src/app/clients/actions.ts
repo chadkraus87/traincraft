@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUserOrThrow } from "@/lib/auth";
 import { isKnownLimitationTag } from "@/lib/safety/rules";
 import type { PlanJson } from "@/lib/types";
 import { MEASUREMENT_FIELDS, CHECKIN_FIELDS } from "@/lib/progress";
@@ -23,8 +24,8 @@ async function must(op: PromiseLike<{ error: { message: string } | null }>): Pro
 
 async function uid() {
   const supabase = await supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in");
+  // requireUserOrThrow also enforces terms acceptance.
+  const user = await requireUserOrThrow();
   return { supabase, userId: user.id };
 }
 

@@ -17,6 +17,7 @@ import { WORKOUT_TYPES, EQUIPMENT_TYPES, type LimitationTag } from "@/lib/safety
 import type { QaReport } from "@/lib/types";
 import { z } from "zod";
 import { overGenerationLimit, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit";
+import { hasAcceptedCurrentTerms, TERMS_REQUIRED } from "@/lib/auth";
 
 export const maxDuration = 120;
 
@@ -43,6 +44,12 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+
+  // Terms gate, same as the pages. A route that processes client health data
+  // must not run for a trainer who hasn't accepted the current versions.
+  if (!(await hasAcceptedCurrentTerms(supabase, user.id))) {
+    return NextResponse.json({ error: TERMS_REQUIRED, termsRequired: true }, { status: 403 });
+  }
 
   // Rate limit before doing any work. Each request costs one or two Claude
   // calls against a shared API key, so an unbounded endpoint lets any

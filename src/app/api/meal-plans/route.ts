@@ -11,6 +11,7 @@ import { loadNutritionContext } from "@/lib/nutrition/context";
 import { buildMealPlan } from "@/lib/ai/meal-builder";
 import { screenFoods, scalePortions, validateMealPlan, isBetterMealAttempt, type Food } from "@/lib/nutrition/meals";
 import { overGenerationLimit, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit";
+import { hasAcceptedCurrentTerms, TERMS_REQUIRED } from "@/lib/auth";
 
 export const maxDuration = 120;
 
@@ -25,6 +26,12 @@ export async function POST(req: Request) {
   const supabase = await supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+
+  // Terms gate, same as the pages. A route that processes client health data
+  // must not run for a trainer who hasn't accepted the current versions.
+  if (!(await hasAcceptedCurrentTerms(supabase, user.id))) {
+    return NextResponse.json({ error: TERMS_REQUIRED, termsRequired: true }, { status: 403 });
+  }
 
   if (await overGenerationLimit(supabase, user.id)) {
     return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });

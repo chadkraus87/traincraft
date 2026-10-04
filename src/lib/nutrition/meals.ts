@@ -207,9 +207,14 @@ export function validateMealPlan(
     !finite ? ["the plan's protein target is missing or invalid"] : totals.filter((t) => t.protein < targets.proteinG * 0.9).map((t) => `day ${t.day}: ${r(t.protein)} g (target ${targets.proteinG} g, minimum ${r(targets.proteinG * 0.9)} g)`),
     `every day at least ${r(targets.proteinG * 0.9)} g protein`);
 
-  const distinct = new Set(items.map((i) => i.food_id)).size;
+  // Counted per day, not across the plan. Flattened, a 7-day plan built from
+  // the same six foods repeated seven times passed — which is the opposite of
+  // what this check is named for.
   const minDistinct = Math.min(6, pool.size);
-  add("variety", distinct < minDistinct ? [`only ${distinct} different foods (minimum ${minDistinct})`] : [], `${distinct} different foods`);
+  const perDay = plan.days.map((d) => ({ day: d.day, n: new Set(d.meals.flatMap((m) => m.items.map((i) => i.food_id))).size }));
+  add("variety",
+    perDay.filter((d) => d.n < minDistinct).map((d) => `day ${d.day}: only ${d.n} different foods (minimum ${minDistinct})`),
+    `at least ${minDistinct} different foods each day`);
 
   return { passed: checks.every((c) => c.pass), checks, attempts };
 }

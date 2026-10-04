@@ -31,9 +31,33 @@ const SENSITIVE_KEY = /email|phone|full_name|name|goals|training_history|note|de
 
 const EMAIL_IN_TEXT = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 
-/** Replace anything that reads like an email address in free text. */
+/**
+ * A client id in a URL is a stable per-person identifier, which is exactly
+ * what the privacy policy says we don't send.
+ */
+const UUID_IN_TEXT = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
+/**
+ * Health vocabulary that must not travel in an error message.
+ *
+ * We throw errors whose text explains *why* a safety gate blocked — "the
+ * screening reported a known cardiovascular, metabolic or kidney condition",
+ * an injury tag interpolated into a message. That is good UX for the trainer
+ * and a health-data disclosure once it reaches an error tracker. Scrubbing
+ * here is the backstop; the real fix is to stop putting clinical text in
+ * Error messages, which is tracked separately.
+ */
+// Letter lookarounds rather than \b: limitation tags are snake_case, and \b
+// does not fire between "_" and "i", so "shoulder_impingement" slipped past.
+const HEALTH_IN_TEXT =
+  /(?<![A-Za-z])(cardiovascular|metabolic|renal|kidney|diabet[a-z]*|eating disorder|disordered eating|pregnan[a-z]*|hypertension|osteoporosis|anaphyla[a-z]*|allerg[a-z]*|impingement|rotator cuff|lumbar|disc injury|acl|patellofemoral|tendinopathy|sciatica|underweight|bmi)(?![A-Za-z])/gi;
+
+/** Replace anything in free text that identifies a person or their health. */
 export function redactText(input: string): string {
-  return input.replace(EMAIL_IN_TEXT, "[redacted-email]");
+  return input
+    .replace(EMAIL_IN_TEXT, "[redacted-email]")
+    .replace(UUID_IN_TEXT, "[redacted-id]")
+    .replace(HEALTH_IN_TEXT, "[redacted-health]");
 }
 
 /**
@@ -83,8 +107,18 @@ export const sharedSentryOptions: NodeOptions & BrowserOptions = {
       if (typeof event.request.query_string === "string") {
         event.request.query_string = redactText(event.request.query_string);
       }
+      // /clients/<uuid>/nutrition names a specific person.
+      if (typeof event.request.url === "string") event.request.url = redactText(event.request.url);
     }
     delete event.user;
+    // The exception message is the one field redactObject can't help with:
+    // it is keyed `value`, which no key-based rule matches, and it is where
+    // our own safety gates put their reasons. Scrubbed explicitly.
+    for (const ex of event.exception?.values ?? []) {
+      if (typeof ex.value === "string") ex.value = redactText(ex.value);
+    }
+    if (typeof event.message === "string") event.message = redactText(event.message);
+    if (typeof event.transaction === "string") event.transaction = redactText(event.transaction);
     return redactObject(event) as SentryErrorEvent;
   },
 

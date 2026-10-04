@@ -5,12 +5,19 @@ import { liveMealPlanCheck, type MealPlanRow } from "@/lib/nutrition/context";
 import { dayTotals } from "@/lib/nutrition/meals";
 import { ALLERGEN_LABELS, type Allergen } from "@/lib/nutrition/gates";
 import { mealPlanToPdf } from "@/lib/pdf";
+import { hasAcceptedCurrentTerms, TERMS_REQUIRED } from "@/lib/auth";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+
+  // Terms gate, same as the pages. A route that processes client health data
+  // must not run for a trainer who hasn't accepted the current versions.
+  if (!(await hasAcceptedCurrentTerms(supabase, user.id))) {
+    return NextResponse.json({ error: TERMS_REQUIRED, termsRequired: true }, { status: 403 });
+  }
 
   const { data } = await supabase.from("meal_plans").select("*").eq("id", id).maybeSingle();
   if (!data) return NextResponse.json({ error: "Meal plan not found" }, { status: 404 });

@@ -111,5 +111,23 @@ function check(name: string, cond: boolean, detail = "") {
   check("console breadcrumbs are dropped entirely", dropped === null);
 }
 
+// Health reasons and client ids travel in exception messages, which are
+// keyed `value` and so invisible to key-based redaction.
+{
+  const ev = {
+    exception: { values: [{ value: "The screening reported a known cardiovascular, metabolic or kidney condition. Record medical clearance before programming." }] },
+    request: { url: "https://app.example/clients/3f1a9c2e-5b7d-4a1f-9e3c-8d2b6a4f0c11/nutrition" },
+    message: "shoulder_impingement is not recognised",
+  } as unknown as Parameters<NonNullable<typeof sharedSentryOptions.beforeSend>>[0];
+  const out = sharedSentryOptions.beforeSend!(ev, {} as never) as typeof ev;
+  const exValue = out.exception!.values![0].value!;
+  check("sentry: health terms are scrubbed from the exception message",
+    !/cardiovascular|metabolic|kidney/i.test(exValue), exValue);
+  check("sentry: a client id is scrubbed from the request url",
+    !/3f1a9c2e-5b7d-4a1f-9e3c-8d2b6a4f0c11/.test(out.request!.url!), out.request!.url!);
+  check("sentry: the top-level message is scrubbed", !/impingement/i.test(out.message!), out.message!);
+  check("sentry: a diagnostic message still survives", /screening reported|Record medical clearance/i.test(exValue), exValue);
+}
+
 console.log(failures === 0 ? "\nALL OBSERVABILITY TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

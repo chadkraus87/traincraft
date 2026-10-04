@@ -1,11 +1,12 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
+import { requireUserOrThrow } from "@/lib/auth";
 
 async function uid() {
   const supabase = await supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in");
+  // requireUserOrThrow also enforces terms acceptance.
+  const user = await requireUserOrThrow();
   return { supabase, userId: user.id };
 }
 

@@ -123,7 +123,12 @@ export function nutritionGate(i: NutritionGateInput): NutritionGate {
   }
 
   if (i.age !== null && i.age < 18) {
-    block({ deficit: true, mealPlans: true }, `Clients under 18 shouldn't be given a calorie deficit or meal plan from this app. ${RD}`);
+    // Targets are blocked too, not just the deficit. Mifflin-St Jeor is an
+    // adult equation that doesn't model growth, so the number would be wrong
+    // anyway — and putting a calorie figure in front of an adolescent is the
+    // highest-risk context there is for disordered eating.
+    block({ targets: true, deficit: true, mealPlans: true },
+      `Clients under 18 shouldn't be given calorie targets or a meal plan from this app. ${RD}`);
   }
   if (i.bmi !== null && i.bmi < 18.5) {
     block({ deficit: true, mealPlans: true }, `BMI is in the underweight range. ${RD}`);

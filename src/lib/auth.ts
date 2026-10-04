@@ -49,12 +49,24 @@ export async function requireUser(opts: { skipTerms?: boolean } = {}): Promise<U
   return user;
 }
 
-/** Server-action variant: throws instead of redirecting. */
+/**
+ * Server-action variant: throws instead of redirecting.
+ *
+ * Terms are enforced here too. Checking them only in requireUser() meant the
+ * gate was page-only: every API route and server action still ran for a
+ * trainer who had never accepted the current versions, which is precisely the
+ * surface that processes client health data. The acceptance record exists to
+ * evidence that they agreed before doing that, so it has to gate the doing.
+ */
 export async function requireUserOrThrow(): Promise<User> {
   const supabase = await supabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not signed in");
+  if (!(await hasAcceptedCurrentTerms(supabase, user.id))) throw new Error(TERMS_REQUIRED);
   return user;
 }
+
+/** Thrown, and returned by API routes, when the current terms aren't accepted. */
+export const TERMS_REQUIRED = "Accept the current Terms, Privacy Policy and DPA before continuing.";

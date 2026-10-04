@@ -195,5 +195,48 @@ check("every limitation tag is classified for nutrition",
   LIMITATION_TAGS.filter((t) => !(t in MEDICAL_NUTRITION_TAGS) && !NUTRITION_NEUTRAL_TAGS.has(t)).join(","));
 check("an unclassified limitation tag blocks meal plans", withProfile({}).mealPlans && !g({ limitationTags: ["future_condition"] }).mealPlans);
 
+// ── Clinical review regressions ─────────────────────────────────────────
+{
+  // Protein capped at the AMDR upper bound, and a carbohydrate floor, so a
+  // high-body-weight client can't be handed a ketogenic prescription.
+  for (const c of [
+    { sex: "male", age: 40, weightLb: 286, heightIn: 69 },
+    { sex: "female", age: 50, weightLb: 397, heightIn: 65 },
+    { sex: "female", age: 30, weightLb: 130, heightIn: 64 },
+    { sex: "male", age: 25, weightLb: 175, heightIn: 71 },
+  ] as const) {
+    for (const goal of ["lose", "maintain", "gain"] as const) {
+      const t = calculateTargets({ ...c, activity: "sedentary", goal, deficitAllowed: true });
+      const label = `${c.weightLb}lb ${c.sex} ${goal}`;
+      check(`macros: protein at or under 35% of energy (${label})`, t.proteinG * 4 <= t.calories * 0.355, `${Math.round(t.proteinG * 4 / t.calories * 100)}%`);
+      check(`macros: carbohydrate floor respected (${label})`, t.carbsG >= Math.min(130, t.calories * 0.45 / 4) - 5, `${t.carbsG} g`);
+      const sum = t.proteinG * 4 + t.fatG * 9 + t.carbsG * 4;
+      check(`macros: macros reconcile to calories (${label})`, Math.abs(sum - t.calories) / t.calories < 0.03, `${Math.round(sum)} vs ${t.calories}`);
+      check(`macros: protein still meaningful (${label})`, t.proteinG >= c.weightLb * 0.45359237 * 1.15, `${t.proteinG} g`);
+    }
+  }
+}
+check("a minor gets no calorie targets at all", !g({ age: 16 }).targets);
+
+{
+  // Variety is counted per day: the same six foods repeated is not variety.
+  const food = (id: string): Food => ({
+    id, fdc_id: 1, name: id, category: "protein", animal_class: "plant", serving_g: 100, serving_desc: "x",
+    max_serving_g: 300, allergens: [], contains_gluten: false, kcal: 100, protein_g: 10, fat_g: 3, carbs_g: 8, is_active: true,
+  });
+  const lib2 = ["a", "b", "c", "d", "e", "f", "g", "h"].map(food);
+  const p2: NutritionProfile = { activity_level: "light", goal: "maintain", diet: "none", allergens: [], gluten_free: false, other_allergy: false, severe_allergy: false };
+  const mealOf = (ids: string[]) => ({ name: "M", items: ids.map((food_id) => ({ food_id, grams: 200 })) });
+  const sameSixBothDays: MealPlanJson = { days: [1, 2].map((day) => ({ day, meals: [mealOf(["a", "b", "c"]), mealOf(["d", "e", "f"])] })) };
+  const T2 = { calories: 1200, proteinG: 120, minCalories: 0 };
+  check("variety: six distinct foods every day passes", validateMealPlan(sameSixBothDays, lib2, p2, T2, 2, 2, 1).checks.find((c) => c.name === "variety")?.pass === true);
+  const thinDay: MealPlanJson = { days: [
+    { day: 1, meals: [mealOf(["a", "b", "c"]), mealOf(["d", "e", "f"])] },
+    { day: 2, meals: [mealOf(["a", "a", "a"]), mealOf(["a", "a", "a"])] },
+  ] };
+  check("variety: a repeated-food day fails even when the plan is varied overall",
+    validateMealPlan(thinDay, lib2, p2, T2, 2, 2, 1).checks.find((c) => c.name === "variety")?.pass === false);
+}
+
 console.log(failures === 0 ? "\nALL NUTRITION TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
